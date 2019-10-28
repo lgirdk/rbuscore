@@ -23,6 +23,7 @@
 #include "rtLog.h"
 #include "rtMessageHeader.h"
 #include "rtSocket.h"
+#include "rtList.h"
 
 #if defined(__GNUC__)                                                          \
     && ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ > 8)))           \
@@ -47,7 +48,6 @@ typedef volatile int atomic_uint_least32_t;
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <glib.h>
 #include <semaphore.h>
 #include <errno.h>
 #include <time.h>
@@ -86,7 +86,7 @@ struct _rtConnection
   struct _rtListener      listeners[RTMSG_LISTENERS_MAX];
   rtMessage               response;
   pthread_mutex_t         mutex;
-  GList *                 pending_requests_list;
+  rtList                  pending_requests_list;
   rtMessageSimpleCallback default_callback;
   unsigned int            run_dispatch;
   pthread_t               dispatch_thread;
@@ -120,10 +120,13 @@ static void onInboxMessage(rtMessageHeader const* hdr, uint8_t const* p, uint32_
     }
 
     pthread_mutex_lock(&con->mutex);
-    GList *list;
-    for(list = con->pending_requests_list; list != NULL; list = list->next)
+    rtListItem listItem;
+    for(rtList_GetFront(con->pending_requests_list, &listItem); 
+        listItem != NULL; 
+        rtListItem_GetNext(listItem, &listItem))
     {
-      pending_request *entry = (pending_request *)list->data;
+      pending_request *entry;
+      rtListItem_GetData(listItem, (void**)&entry);
       if(entry->sequence_number == hdr->sequence_number)
       {
         entry->response = con->response;
@@ -343,7 +346,7 @@ rtConnection_Create(rtConnection* con, char const* application_name, char const*
 #endif
   c->application_name = strdup(application_name);
   c->fd = -1;
-  c->pending_requests_list = NULL;
+  rtList_Create(&c->pending_requests_list);
   c->default_callback = NULL;
   c->run_dispatch = 0;
   memset(c->inbox_name, 0, RTMSG_HEADER_MAX_TOPIC_LENGTH);
@@ -406,12 +409,19 @@ rtConnection_Destroy(rtConnection con)
     /*Unblock all threads waiting for RPC responses.*/
     pthread_mutex_lock(&con->mutex);
     int found_pending_requests = 0;
-    GList *list;
-    for(list = con->pending_requests_list; list != NULL; list = list->next)
+
+    rtListItem listItem;
+    for(rtList_GetFront(con->pending_requests_list, &listItem); 
+        listItem != NULL; 
+        rtListItem_GetNext(listItem, &listItem))
     {
+      pending_request *entry;
+      rtListItem_GetData(listItem, (void**)&entry);
+
       found_pending_requests = 1;
-      sem_post(&((pending_request *)(list->data))->sem);
+      sem_post(&entry->sem);
     }
+    rtList_Destroy(con->pending_requests_list,NULL);
     pthread_mutex_unlock(&con->mutex);
     if(0 != found_pending_requests)
     {
@@ -529,6 +539,7 @@ rtConnection_SendRequest(rtConnection con, rtMessage const req, char const* topi
   struct timespec until;
   int wait_result;
   uint32_t sequence_number;
+  rtListItem listItem;
   
   pid_t tid = syscall(__NR_gettid);
   rtMessage_ToByteArrayWithSize(req, &p, DEFAULT_SEND_BUFFER_SIZE, &n);
@@ -546,7 +557,7 @@ rtConnection_SendRequest(rtConnection con, rtMessage const req, char const* topi
   sem_init(&queue_entry.sem, 0, 0);
   queue_entry.response = NULL;
 
-  con->pending_requests_list = g_list_prepend(con->pending_requests_list, (gpointer)&queue_entry);
+  rtList_PushFront(con->pending_requests_list, (void*)&queue_entry, &listItem);
   
   err = rtConnection_SendInternal(con, topic, p, n, con->inbox_name, rtMessageFlags_Request, sequence_number);
   if (err != RT_OK)
@@ -639,7 +650,7 @@ rtConnection_SendRequest(rtConnection con, rtMessage const req, char const* topi
   }
 
 dequeue_and_return:
-  con->pending_requests_list = g_list_remove(con->pending_requests_list, (gpointer)&queue_entry);
+  rtList_RemoveItem(con->pending_requests_list, listItem, NULL);
   pthread_mutex_unlock(&con->mutex);
   sem_destroy(&queue_entry.sem);
   return ret;

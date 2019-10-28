@@ -27,7 +27,6 @@ set(CMAKE_BUILD_TYPE Debug)
 set(RDKLOGGER_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../../../rdklogger/)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GLIB2 REQUIRED glib-2.0)
 
 set(CMAKE_C_FLAGS_DEBUG "-DENABLE_ROUTER_BENCHMARKING -Wall -Wextra -g -O0 -fno-inline")
 set(CMAKE_C_FLAGS_RELEASE "-DENABLE_ROUTER_BENCHMARKING -Werror -Wall -Wextra")
@@ -102,21 +101,19 @@ if (BUILD_FOR_DESKTOP)
 	message("Building for desktop")
 	include_directories(
 		${CMAKE_CURRENT_SOURCE_DIR}
-		${CMAKE_CURRENT_SOURCE_DIR}/msgpack/src/msgpack/include
-		${GLIB2_INCLUDE_DIRS})
+		${CMAKE_CURRENT_SOURCE_DIR}/msgpack/src/msgpack/include)
 	link_directories(
 		${CMAKE_CURRENT_SOURCE_DIR}
 		${CMAKE_CURRENT_SOURCE_DIR}/msgpack/build
 		${CMAKE_BINARY_DIR}
-		${LIBRARY_DIR}
-		${GLIB2_LIBRARY_DIRS})
+		${LIBRARY_DIR})
 else()
 	if (ENABLE_RDKLOGGER)
-		include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${INCLUDE_DIR} ${INCLUDE_DIR}/messagepack ${RDKLOGGER_PATH} ${RDKLOGGER_PATH}/include ${GLIB2_INCLUDE_DIRS})
+		include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${INCLUDE_DIR} ${INCLUDE_DIR}/messagepack ${RDKLOGGER_PATH} ${RDKLOGGER_PATH}/include)
 		link_directories(${CMAKE_CURRENT_SOURCE_DIR} ${LIBRARY_DIR} ${RDKLOGGER_PATH}/src/.libs/)
 		add_definitions(-DENABLE_RDKLOGGER)
 	else ()
-		include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${INCLUDE_DIR} ${INCLUDE_DIR}/messagepack ${GLIB2_INCLUDE_DIRS})
+		include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${INCLUDE_DIR} ${INCLUDE_DIR}/messagepack)
 		link_directories(${CMAKE_CURRENT_SOURCE_DIR} ${LIBRARY_DIR})
 	endif (ENABLE_RDKLOGGER)
 endif (BUILD_FOR_DESKTOP)
@@ -141,6 +138,7 @@ if (BUILD_RTMESSAGE_LIB)
 		rtMessage_mpack.c
 		rtSocket.c
 		rtVector.c
+    rtList.c
 		base64.c
 		routing_tree.c
 		local_benchmarking.c)
@@ -151,7 +149,7 @@ if (BUILD_RTMESSAGE_LIB)
 			target_link_libraries(rtMessage -llog4c -lrdkloggers)
 		endif (ENABLE_RDKLOGGER)
 	endif(BUILD_FOR_DESKTOP)
-	target_link_libraries(rtMessage ${LIBRARY_LINKER_OPTIONS} -pthread -lmsgpackc -lglib-2.0)
+	target_link_libraries(rtMessage ${LIBRARY_LINKER_OPTIONS} -pthread -lmsgpackc)
 	set_target_properties(rtMessage
 		PROPERTIES SOVERSION "0"
 		VERSION "${PROJECT_VERSION}")
