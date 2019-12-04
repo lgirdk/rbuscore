@@ -18,7 +18,7 @@
 ##########################################################################
 [Unit]
 Description= An IPC framework
-After=systemd-nvram.service rbus_session_mgr.service
+After=rbus_session_mgr.service
 ConditionPathExists=/nvram/rbus
 
 [Service]

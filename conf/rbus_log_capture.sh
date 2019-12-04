@@ -1,9 +1,14 @@
 RBUS_LOG_FILE="/rdklogs/logs/rtrouted.log"
 LAST_RBUS_LOG_TIME="/tmp/lastrtroutedlogtime"
 current_time=0
-lastync_time=0
-BootupLog_is_updated=0
-while [ 1 ]
+lastsync_time=0
+loop=0
+
+if [ -f /nvram/rbus_support ]; then
+    loop=1
+fi
+
+while [ $loop -eq 1 ]
 do
    current_time=$(date +%s)
    if [ -f "$LAST_RBUS_LOG_TIME" ];then
