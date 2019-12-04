@@ -147,7 +147,8 @@ if (BUILD_RTMESSAGE_LIB)
 		rtMessage_mpack.c
 		rtSocket.c
 		rtVector.c
-    rtList.c
+        rtList.c
+        rtRetainable.c
 		base64.c
 		routing_tree.c
 		local_benchmarking.c)
@@ -268,5 +269,5 @@ if (BUILD_RTMESSAGE_ONLY)
 	install (TARGETS rtrouted rtMessage rtm_diag_probe
 		RUNTIME DESTINATION bin
 		LIBRARY DESTINATION lib)
-	install(FILES rtMessage.h rtMessageHeader.h rtError.h rtConnection.h rtVector.h rtLog.h rtm_discovery_api.h DESTINATION "include/rbus-core")
+	install(FILES rtMessage.h rtMessageHeader.h rtError.h rtConnection.h rtVector.h rtRetainable.h rtLog.h rtList.h rtm_discovery_api.h DESTINATION "include/rbus-core")
 endif (BUILD_RTMESSAGE_ONLY)

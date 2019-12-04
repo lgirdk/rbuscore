@@ -1144,6 +1144,9 @@ static void * rtConnection_CallbackThread(void *data)
 
     pthread_mutex_unlock(&con->callback_message_mutex);
 
+    if(0 == con->run_threads)
+        break;
+
     /*Execute listener callbacks for all messages in callback_message_list.
       Remove messages from list as you go and return once the list is empty.
       Very important to not keep any mutex lock while executing the callback*/
@@ -1191,6 +1194,7 @@ static void * rtConnection_CallbackThread(void *data)
       }
 
       rtMessage_Release(dmsg->msg);
+      dmsg->msg = NULL;
 
       pthread_mutex_lock(&con->callback_message_mutex);
 
@@ -1261,7 +1265,13 @@ static int rtConnection_StartThreads(rtConnection con)
 static int rtConnection_StopThreads(rtConnection con)
 {
   rtLog_Info("Stopping threads");
+
   con->run_threads = 0;
+
+  pthread_mutex_lock(&con->callback_message_mutex);
+  pthread_cond_signal(&con->callback_message_cond);
+  pthread_mutex_unlock(&con->callback_message_mutex);
+
   pthread_join(con->reader_thread, NULL);
   pthread_join(con->callback_thread, NULL);
   return 0;

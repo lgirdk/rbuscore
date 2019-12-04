@@ -18,7 +18,6 @@
 ##########################################################################
 [Unit]
 Description= Session manager for rbus
-After=systemd-nvram.service
 #Although this will launch before rbus, it will block until rbus is available
 #and will be immediately available for any other processes once rbus is up.
 Before=rbus.service

@@ -77,6 +77,8 @@ namespace rbus_server
         bool process_event_subscriptions;
         method_table_entry_t method_callbacks[MAX_SUPPORTED_METHODS];
         std::vector <event_entry_t> subscription_table;
+        rbus_event_subscribe_callback_t subscribe_handler_override;
+        void* subscribe_handler_data;
 
         rbus_error_t addSubscriber(const char * event, const char * subscriber)
         {
@@ -87,6 +89,11 @@ namespace rbus_server
                 return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
             }
             
+            if(subscribe_handler_override)
+            {
+                return (rbus_error_t)subscribe_handler_override(name, event, subscriber, 1, subscribe_handler_data);
+            }
+
             const auto iter = std::find_if(subscription_table.begin(), subscription_table.end(), 
                     [&event](const event_entry_t &entry) -> bool { return (entry.event_name == event); });
 
@@ -109,6 +116,11 @@ namespace rbus_server
             {
                 rtLog_Error("Cannot remove subscriber %s to event %s. Length exceeds limits.", subscriber, event); //TODO: bad idea tp try to print a bad input. Clean up.
                 return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+            }
+
+            if(subscribe_handler_override)
+            {
+                return (rbus_error_t)subscribe_handler_override(name, event, subscriber, 0, subscribe_handler_data);
             }
 
             const auto iter = std::find_if(subscription_table.begin(), subscription_table.end(), 
@@ -329,7 +341,6 @@ static void onMessage(rtMessageHeader const* hdr, rtMessage msg, void* closure)
     using namespace rbus_server;
     static int stack_counter = 0;
     stack_counter++;
-    rtError err = RT_OK;
     rbus_object * ptr = (rbus_object *)closure;
 
     if(1 != stack_counter)
@@ -496,6 +507,8 @@ static void perform_clean_up()
             obj->subscription_table.clear();
             for(int j = 0; j < MAX_SUPPORTED_METHODS; j++)
                 obj->method_callbacks[j].method.clear();
+            obj->subscribe_handler_override = NULL;
+            obj->subscribe_handler_data = NULL;
         }
     }
     {
@@ -579,6 +592,8 @@ rbus_error_t rbus_registerObj(const char * object_name, rbus_callback_t handler,
         g_object_table[insert_candidate_offset].data = user_data;
         strncpy(g_object_table[insert_candidate_offset].name, object_name, (MAX_OBJECT_NAME_LENGTH - 1));
         g_object_table[insert_candidate_offset].num_registered_methods = 0;
+        g_object_table[insert_candidate_offset].subscribe_handler_override = NULL;
+        g_object_table[insert_candidate_offset].subscribe_handler_data = NULL;
         unlock();
     }
     else
@@ -757,6 +772,8 @@ rbus_error_t rbus_unregisterObj(const char * object_name)
         obj->subscription_table.clear();
         for(int j = 0; j < MAX_SUPPORTED_METHODS; j++)
             obj->method_callbacks[j].method.clear();
+        obj->subscribe_handler_override = NULL;
+        obj->subscribe_handler_data = NULL;
         rtLog_Info("Unregistered object %s.", object_name);
     }
     else
@@ -1354,6 +1371,66 @@ rbus_error_t rbus_publishEvent(const char* object_name,  const char * event_name
     return ret;
 }
 
+rbus_error_t rbus_registerSubscribeHandler(const char* object_name, rbus_event_subscribe_callback_t callback, void * user_data)
+{
+    using namespace rbus_server;
+    rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+
+    if((NULL == object_name) || (NULL == callback))
+    {
+        rtLog_Error("Invalid parameter(s)");
+        return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+    }
+
+    lock();
+    rbus_object *obj = get_object(object_name);
+    if(NULL != obj)
+    {
+        obj->subscribe_handler_override = callback;
+        obj->subscribe_handler_data = user_data;
+        if(false == obj->process_event_subscriptions)
+            ret = install_subscription_handlers(*obj);
+    }
+    else
+    {
+        rtLog_Error("Could not find object %s", object_name);
+        ret = RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+    }
+    unlock();
+    return ret;
+}
+
+rbus_error_t rbus_publishSubscriberEvent(const char* object_name,  const char * event_name, const char* listener, rtMessage out)
+{
+    using namespace rbus_server;
+    rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+    if(NULL == event_name)
+        event_name = DEFAULT_EVENT;
+    if(MAX_OBJECT_NAME_LENGTH <= strnlen(object_name, MAX_OBJECT_NAME_LENGTH))
+    {
+        rtLog_Error("Object name is too long.");
+        return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+    }
+    rtMessage_BeginMetaSectionWrite(out);
+    rbus_SetString(out, MESSAGE_FIELD_EVENT_NAME, event_name);
+    rbus_SetString(out, MESSAGE_FIELD_EVENT_SENDER, object_name); 
+    rtMessage_EndMetaSectionWrite(out);
+    lock();
+    rbus_object *obj = get_object(object_name);
+    if(NULL == obj)
+    {
+        /*Object not present yet. Register it now.*/
+        rtLog_Error("Could not find object %s", object_name);
+        ret = RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+    }
+    if(rbus_sendMessage(out, listener, object_name) != RTMESSAGE_BUS_SUCCESS)
+    {
+       rtLog_Error("Couldn't send event %s::%s to %s.", object_name, event_name, listener);
+    }
+    unlock();
+    return ret;
+}
+
 rbus_error_t rbus_registeredComponents(rtMessage *in)
 {
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
@@ -1489,3 +1566,27 @@ rbus_error_t rbus_findMatchingObjects(const char* elements[], const int len, cha
 }
 rbus_error_t subscribeOnevent(const char * path, rbus_callback_t callback);
 rbus_error_t unsubscribeOnevent(const char * path);
+
+rbuscore_bus_status_t rbuscore_checkBusStatus(void)
+{
+    if(access("/nvram/rbus_support", F_OK) == 0)
+    {
+        rtLog_Info ("Currently RBus Enabled");
+        return RBUSCORE_ENABLED;
+    }
+    else if(access("/nvram/rbus_support_on_pending", F_OK) == 0)
+    {
+        rtLog_Info ("Currently RBus is Disabled; Next boot - RBus Enabled");
+        return RBUSCORE_ENABLED_PENDING;
+    }
+    else if(access("/nvram/rbus_support_off_pending", F_OK) == 0)
+    {
+        rtLog_Info ("Currently RBus is Enabled; Next boot - RBus Disabled");
+        return RBUSCORE_DISABLED_PENDING;
+    }
+    else
+    {
+        rtLog_Info ("Currently RBus Disabled");
+        return RBUSCORE_DISABLED;
+    }
+}

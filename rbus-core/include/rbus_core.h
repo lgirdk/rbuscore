@@ -27,7 +27,7 @@
 
 #define MAX_OBJECT_NAME_LENGTH RTMSG_HEADER_MAX_TOPIC_LENGTH
 #define MAX_METHOD_NAME_LENGTH 64
-#define MAX_EVENT_NAME_LENGTH MAX_METHOD_NAME_LENGTH
+#define MAX_EVENT_NAME_LENGTH MAX_OBJECT_NAME_LENGTH
 #define MAX_SUPPORTED_METHODS 32
 #define MAX_REGISTERED_OBJECTS 64
 
@@ -132,6 +132,15 @@ rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event
 /* Unsubscribe from receiving 'event_name' events from 'object_name' object. If the object supports only one event, event_name can be NULL. */
 rbus_error_t rbus_unsubscribeFromEvent(const char * object_name,  const char * event_name);
 
+/* The following 2 methods were added to allow rbus 2.0 to handle the event subscriber list directly.
+   These replace the use of rbus_registerEvent/rbus_publishEvent.
+   When used, these disable the rbuscore built-in server-side event subscription handling.
+ */
+/* Register a callback which will be called when any subscriber subscribes to any event.
+   This disables the rbuscore built-in server-side event subscription handling. */
+rbus_error_t rbus_registerSubscribeHandler(const char* object_name, rbus_event_subscribe_callback_t callback, void * user_data);
+/* Send an event message directly to a specific subscribe(e.g. listener) */
+rbus_error_t rbus_publishSubscriberEvent(const char* object_name,  const char * event_name, const char* listener, rtMessage out);
 
 /*------ Convenience functions built on top of base functions above. ------*/
 
@@ -163,6 +172,9 @@ rbus_error_t rbus_GetElementsAddedByObject(const char * expression, rtMessage *i
  It's caller's responsibility to free the individual strings in 'objects' array as well as 'objects' itself. If look-up fails for any of the elements, it will be 
  represented by an empty string in the objects array. If this function returns error, do not try to dereference/free 'objects'.*/
 rbus_error_t rbus_findMatchingObjects(const char* elements[], const int len, char *** objects);
+
+/* Get the rbus status; to find out whether the rbus is enabled or not. The application can take action (ex: registration of events) based on this return value. */
+rbuscore_bus_status_t rbuscore_checkBusStatus(void);
 #ifdef __cplusplus
 }
 #endif
