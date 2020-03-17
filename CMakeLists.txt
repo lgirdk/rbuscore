@@ -47,6 +47,20 @@ endif ()
 
 # Below option downloads and builds Messagepack library, builds low level rtmessage libraries, its daemon and sample app, plus intermediate level bus-core API libraries and its sample apps.
 if (BUILD_FOR_DESKTOP)
+	# Make sure clang-tidy is installed. "make run-clang-tidy" will generate the clang-tidy-output
+	find_program(GENERATOR run-clang-tidy)
+	if(NOT GENERATOR)
+		message("clang-tidy not found!")
+	else ()
+		set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+		set(CLANG_TIDY_EXE "/usr/bin/run-clang-tidy")
+		add_custom_target(run-clang-tidy ALL
+			WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+			COMMENT "Creating clang output"
+			COMMAND ${CLANG_TIDY_EXE} -checks=-*,clang-analyzer-* 2>&1 > ${CMAKE_CURRENT_BINARY_DIR}/clang-tidy-output.txt
+			DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json)
+        endif()
+
 	option(BUILD_RTMESSAGE_LIB "BUILD_RTMESSAGE_LIB" ON)
 	option(BUILD_RTMESSAGE_SAMPLE_APP "BUILD_RTMESSAGE_SAMPLE_APP" ON)
 	option(BUILD_RTMESSAGE_ROUTED "BUILD_RTMESSAGE_ROUTED" ON)
