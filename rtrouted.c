@@ -166,8 +166,8 @@ rtRouted_ClearRoute(rtRouteEntry * route)
   rtVector_RemoveItem(routes, route, NULL);
   free(route->subscription);
   rtLog_Info("Clearing route %s", route->expression);
-  free(route);
   rtree_remove_nodes_matching_value((void *)route);
+  free(route);
   return RT_OK;
 }
 
@@ -290,8 +290,8 @@ rtRouted_ForwardMessage(rtConnectedClient* sender, rtMessageHeader* hdr, uint8_t
   new_header.topic_length = hdr->topic_length;
   new_header.reply_topic_length = hdr->reply_topic_length;
   new_header.flags = hdr->flags;
-  strcpy(new_header.topic, hdr->topic);
-  strcpy(new_header.reply_topic, hdr->reply_topic);
+  strncpy(new_header.topic, hdr->topic, RTMSG_HEADER_MAX_TOPIC_LENGTH-1);
+  strncpy(new_header.reply_topic, hdr->reply_topic, RTMSG_HEADER_MAX_TOPIC_LENGTH-1);
   rtMessageHeader_Encode(&new_header, subscription->client->send_buffer);
 
   // rtDebug_PrintBuffer("fwd header", subscription->client->send_buffer, new_header.length);
@@ -322,8 +322,8 @@ static void prep_reply_header_from_request(rtMessageHeader *reply, const rtMessa
   reply->sequence_number = request->sequence_number;
   reply->flags = rtMessageFlags_Response;
 
-  strcpy(reply->topic, request->reply_topic);
-  strcpy(reply->reply_topic, request->topic);
+  strncpy(reply->topic, request->reply_topic, RTMSG_HEADER_MAX_TOPIC_LENGTH-1);
+  strncpy(reply->reply_topic, request->topic, RTMSG_HEADER_MAX_TOPIC_LENGTH-1);
   reply->topic_length = request->reply_topic_length;
   reply->reply_topic_length = request->topic_length;
 }
@@ -872,7 +872,7 @@ rtRouted_PushFd(fd_set* fds, int fd, int* maxFd)
 static void
 rtRouted_RegisterNewClient(int fd, struct sockaddr_storage* remote_endpoint)
 {
-  char remote_address[64];
+  char remote_address[128];
   uint16_t remote_port;
   rtConnectedClient* new_client;
 
@@ -944,7 +944,7 @@ rtRouted_BindListener(char const* socket_name, int no_delay)
     if (no_delay)
       setsockopt(listener->fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
 
-    ret = setsockopt(listener->fd, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one));
+    setsockopt(listener->fd, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one));
     num_retries = 18; //Special handling for TCP sockets: keep retrying for 3 minutes, 10s after each failure. This helps if networking is slow to come up.
   }
 
@@ -1017,7 +1017,7 @@ int main(int argc, char* argv[])
   {
     route = (rtRouteEntry *) malloc(sizeof(rtRouteEntry));
     route->subscription = NULL;
-    strcpy(route->expression, "_RTROUTED.>");
+    strncpy(route->expression, "_RTROUTED.>", RTMSG_MAX_EXPRESSION_LEN-1);
     route->message_handler = rtRouted_OnMessage;
     rtVector_PushBack(routes, route);
     rtree_set_value("_RTROUTED.INBOX.SUBSCRIBE", (void *)route);
@@ -1068,7 +1068,7 @@ int main(int argc, char* argv[])
         route = (rtRouteEntry *) malloc(sizeof(rtRouteEntry));
         route->subscription = NULL;
         route->message_handler = &rtRouted_PrintMessage;
-        strcpy(route->expression, ">");
+        strncpy(route->expression, ">", RTMSG_MAX_EXPRESSION_LEN-1);
         rtVector_PushBack(routes, route);
       }
       case '?':

@@ -151,22 +151,16 @@ TEST_F(TestMarshallingAPIs, rbus_SetString_test4)
 
     for(i = 0; i < 100; i++)
     {
-        strncpy(tag, tagOriginal, sizeof(tag));
-        strncpy(value,valueOriginal, sizeof(value));
-        sprintf(count, "%d", i);
-        strcat(tag, count);
-        strcat(value, count);
+        snprintf(tag, (sizeof(tag) - 1), "%s%d", tagOriginal, i);
+        snprintf(value, (sizeof(value) - 1), "%s%d", valueOriginal, i);
         rbus_SetString(testMessage, tag, value);
     }
     memset(tag, 0, 50);
     memset(value, 0, 50);
     for(i = 0; i < 100; i++)
     {
-        strncpy(tag, tagOriginal, sizeof(tag));
-        strncpy(value,valueOriginal, sizeof(value));
-        sprintf(count, "%d", i);
-        strcat(tag, count);
-        strcat(value, count);
+        snprintf(tag, (sizeof(tag) - 1), "%s%d", tagOriginal, i);
+        snprintf(value, (sizeof(value) - 1), "%s%d", valueOriginal, i);
         err = rbus_GetString(testMessage, tag, &resultValue);
         EXPECT_EQ(err, RT_OK) << "rbus call failed";
         EXPECT_STREQ(resultValue, value) << "rbus_SetString failed for tag : " << tag ;
@@ -193,22 +187,16 @@ TEST_F(TestMarshallingAPIs, rbus_SetString_test5)
 
     for(i = 0; i < 10000; i++)
     {
-        strncpy(tag, tagOriginal, sizeof(tag));
-        strncpy(value,valueOriginal, sizeof(value));
-        sprintf(count, "%d", i);
-        strcat(tag, count);
-        strcat(value, count);
+        snprintf(tag, (sizeof(tag) - 1), "%s%d", tagOriginal, i);
+        snprintf(value, (sizeof(value) - 1), "%s%d", valueOriginal, i);
         rbus_SetString(testMessage, tag, value);
     }
     memset(tag, 0, 50);
     memset(value, 0, 50);
     for(i = 0; i < 10000; i++)
     {
-        strncpy(tag, tagOriginal, sizeof(tag));
-        strncpy(value,valueOriginal, sizeof(value));
-        sprintf(count, "%d", i);
-        strcat(tag, count);
-        strcat(value, count);
+        snprintf(tag, (sizeof(tag) - 1), "%s%d", tagOriginal, i);
+        snprintf(value, (sizeof(value) - 1), "%s%d", valueOriginal, i);
         err = rbus_GetString(testMessage, tag, &resultValue);
         EXPECT_EQ(err, RT_OK) << "rbus call failed";
         EXPECT_STREQ(resultValue, value) << "rbus_SetString failed for tag : " << tag ;
@@ -235,22 +223,16 @@ TEST_F(TestMarshallingAPIs, rbus_SetString_test6)
 
     for(i = 0; i < 100000; i++)
     {
-        strncpy(tag, tagOriginal, sizeof(tag));
-        strncpy(value,valueOriginal, sizeof(value));
-        sprintf(count, "%d", i);
-        strcat(tag, count);
-        strcat(value, count);
+        snprintf(tag, (sizeof(tag) - 1), "%s%d", tagOriginal, i);
+        snprintf(value, (sizeof(value) - 1), "%s%d", valueOriginal, i);
         rbus_SetString(testMessage, tag, value);
     }
     memset(tag, 0, 50);
     memset(value, 0, 50);
     for(i = 0; i < 100000; i++)
     {
-        strncpy(tag, tagOriginal, sizeof(tag));
-        strncpy(value,valueOriginal, sizeof(value));
-        sprintf(count, "%d", i);
-        strcat(tag, count);
-        strcat(value, count);
+        snprintf(tag, (sizeof(tag) - 1), "%s%d", tagOriginal, i);
+        snprintf(value, (sizeof(value) - 1), "%s%d", valueOriginal, i);
         err = rbus_GetString(testMessage, tag, &resultValue);
         EXPECT_EQ(err, RT_OK) << "rbus call failed";
         EXPECT_STREQ(resultValue, value) << "rbus_SetString failed for tag : " << tag ;
@@ -369,18 +351,14 @@ TEST_F(TestMarshallingAPIs, rbus_AppendString_test4)
 
     for(i = 0; i < 100; i++)
     {
-        strncpy(value,valueOriginal, sizeof(value));
-        sprintf(count, "%d", i);
-        strcat(value, count);
+        snprintf(value, (sizeof(value) - 1), "%s%d", valueOriginal, i);
         err = rbus_AppendString(testMessage, value);
         EXPECT_EQ(err, RT_OK) << "rbus call failed";
     }
     memset(value, 0, 50);
     for(i = 0; i < 100; i++)
     {
-        strncpy(value,valueOriginal, sizeof(value));
-        sprintf(count, "%d", i);
-        strcat(value, count);
+        snprintf(value, (sizeof(value) - 1), "%s%d", valueOriginal, i);
         err = rbus_PopString(testMessage, &resultValue);
         EXPECT_EQ(err, RT_OK) << "rbus call failed";
         EXPECT_STREQ(resultValue, value) << "rbus_AppendString failed for iteration: " << i ;
@@ -507,7 +485,7 @@ TEST_F(TestMarshallingAPIs, rbus_GetStringItem_test1)
 
     for(i = 0; i < 3; i++)
     {
-        err = rbus_GetStringItem(testMessage, tag, i, result, sizeof(result));
+        rbus_GetStringItem(testMessage, tag, i, result, sizeof(result));
         EXPECT_STREQ(result, *(value + i)) << "rbus_GetStringItem failed for index " << i;
         memset(result, 0, sizeof(result));
     }
@@ -598,22 +576,17 @@ TEST_F(TestMarshallingAPIs, rbus_SetInt32_test3)
 
     for(i = 0; i < 100; i++)
     {
-        strncpy(tag, tagOriginal, sizeof(tag));
         value = valueOriginal;
-        sprintf(count, "%d", i);
-        strcat(tag, count);
+        snprintf(tag, (sizeof(tag) - 1), "%s%d", tagOriginal, i);
         value = value * i;
         err = rbus_SetInt32(testMessage, tag, value);
         EXPECT_EQ(err, RT_OK) << "rbus call failed";
     }
     memset(tag, 0, 50);
-    value = 0;
     for(i = 0; i < 100; i++)
     {
-        strncpy(tag, tagOriginal, sizeof(tag));
         value = valueOriginal;
-        sprintf(count, "%d", i);
-        strcat(tag, count);
+        snprintf(tag, (sizeof(tag) - 1), "%s%d", tagOriginal, i);
         value = value * i;
         err = rbus_GetInt32(testMessage, tag, &resultValue);
         EXPECT_EQ(err, RT_OK) << "rbus call failed";
@@ -680,7 +653,6 @@ TEST_F(TestMarshallingAPIs, rbus_AppendInt32_test3)
         err = rbus_AppendInt32(testMessage, value);
         EXPECT_EQ(err, RT_OK) << "rbus call failed";
     }
-    value = 0;
     for(i = 0; i < 100; i++)
     {
         value = valueOriginal;
@@ -750,22 +722,17 @@ TEST_F(TestMarshallingAPIs, rbus_SetDouble_test3)
 
     for(i = 0; i < 100; i++)
     {
-        strncpy(tag, tagOriginal, sizeof(tag));
         value = valueOriginal;
-        sprintf(count, "%d", i);
-        strcat(tag, count);
+        snprintf(tag, (sizeof(tag) - 1), "%s%d", tagOriginal, i);
         value = value * i;
         err = rbus_SetDouble(testMessage, tag, value);
         EXPECT_EQ(err, RT_OK) << "rbus call failed";
     }
     memset(tag, 0, 50);
-    value = 0;
     for(i = 0; i < 100; i++)
     {
-        strncpy(tag, tagOriginal, sizeof(tag));
         value = valueOriginal;
-        sprintf(count, "%d", i);
-        strcat(tag, count);
+        snprintf(tag, (sizeof(tag) - 1), "%s%d", tagOriginal, i);
         value = value * i;
         err = rbus_GetDouble(testMessage, tag, &resultValue);
         EXPECT_EQ(err, RT_OK) << "rbus call failed";
@@ -833,7 +800,6 @@ TEST_F(TestMarshallingAPIs, rbus_AppendDouble_test3)
         err = rbus_AppendDouble(testMessage, value);
         EXPECT_EQ(err, RT_OK) << "rbus call failed";
     }
-    value = 0;
     for(i = 0; i < 100; i++)
     {
         value = valueOriginal;

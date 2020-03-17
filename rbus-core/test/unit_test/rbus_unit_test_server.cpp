@@ -104,14 +104,12 @@ static void CREATE_RBUS_SERVER(int handle)
 
 static void CREATE_RBUS_SERVER_REG_OBJECT(int handle)
 {
-    char server_name[20] = "test_server_";
+    char server_name[64] = "";
     char buffer[DEFAULT_RESULT_BUFFERSIZE];
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    char count[10] = {};
 
     memset( buffer, 0, DEFAULT_RESULT_BUFFERSIZE );
-    sprintf(count, "%d", handle);
-    strcat(server_name, count);
+    snprintf(server_name, (sizeof(server_name) - 1), "%s%d", "test_server_", handle);
 
     printf("*** CREATING SERVER : %s \n", server_name);
 
