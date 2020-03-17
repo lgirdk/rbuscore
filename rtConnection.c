@@ -169,12 +169,10 @@ rtConnection_ShouldReregister(rtError e)
 static rtError
 rtConnection_ConnectAndRegister(rtConnection con)
 {
-  int i;
-  int ret;
+  int i = 1;
+  int ret = 0;
   socklen_t socket_length;
 
-  i = 1;
-  ret = 0;
   rtSocketStorage_GetLength(&con->remote_endpoint, &socket_length);
 
   if (con->fd != -1)
@@ -212,8 +210,8 @@ rtConnection_ConnectAndRegister(rtConnection con)
   {
     uint16_t local_port;
     uint16_t remote_port;
-    char local_addr[64];
-    char remote_addr[64];
+    char local_addr[128];
+    char remote_addr[128];
 
     rtSocketStorage_ToString(&con->local_endpoint, local_addr, sizeof(local_addr), &local_port);
     rtSocketStorage_ToString(&con->remote_endpoint, remote_addr, sizeof(remote_addr), &remote_port);
@@ -303,11 +301,8 @@ rtConnection_ReadUntil(rtConnection con, uint8_t* buff, int count, int32_t timeo
 rtError
 rtConnection_Create(rtConnection* con, char const* application_name, char const* router_config)
 {
-  int i;
-  rtError err;
-
-  i = 0;
-  err = RT_OK;
+  int i = 0;
+  rtError err = RT_OK;
 
   rtConnection c = (rtConnection) malloc(sizeof(struct _rtConnection));
   if (!c)
@@ -658,11 +653,11 @@ rtConnection_SendInternal(rtConnection con, char const* topic, uint8_t const* bu
   rtMessageHeader_Init(&header);
   header.payload_length = n;
 
-  strcpy(header.topic, topic);
+  strncpy(header.topic, topic, RTMSG_HEADER_MAX_TOPIC_LENGTH-1);
   header.topic_length = strlen(header.topic);
   if (reply_topic)
   {
-    strcpy(header.reply_topic, reply_topic);
+    strncpy(header.reply_topic, reply_topic, RTMSG_HEADER_MAX_TOPIC_LENGTH-1);
     header.reply_topic_length = strlen(reply_topic);
   }
   else

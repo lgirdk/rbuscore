@@ -30,12 +30,12 @@
 struct node_t;
 typedef struct node_t
 {
-    char * name;
-    unsigned int name_length;
     struct node_t *parent;
     struct node_t **children_head;
-    unsigned int num_children;
+    char * name;
     void * value;
+    unsigned int name_length;
+    unsigned int num_children;
 } node_t;
 
 typedef enum
