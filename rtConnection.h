@@ -32,10 +32,8 @@ extern "C" {
 struct _rtConnection;
 typedef struct _rtConnection* rtConnection;
 
-typedef void (*rtMessageCallback)(rtMessageHeader const* hdr, uint8_t const* buff,
-  uint32_t n, void* closure);
+typedef void (*rtMessageCallback)(rtMessageHeader const* hdr, rtMessage msg, void* closure);
 
-typedef void (*rtMessageSimpleCallback)(rtMessageHeader const * hdr, rtMessage message);
 typedef enum
 {
   rtConnectionState_ReadHeaderPreamble,
@@ -61,6 +59,7 @@ rtConnection_Create(rtConnection* con, char const* application_name, char const*
 rtError
 rtConnection_Destroy(rtConnection con);
 
+#if 0
 /** Send an Error message to caller when no provide/Route is available
  *@param clnt_fd
  *@param request_header
@@ -68,6 +67,7 @@ rtConnection_Destroy(rtConnection con);
  */
 rtError
 rtConnection_SendErrorMessageToCaller(int clnt_fd , rtMessageHeader const* request_header);
+#endif
 
 /**
  * Sends a message
@@ -151,24 +151,7 @@ rtConnection_RemoveAlias(rtConnection con, char const* existing, const char *ali
  * @return error
  */
 rtError
-rtConnection_AddDefaultListener(rtConnection con,
-  rtMessageSimpleCallback callback);
-/**
- * Dispatch incoming messages
- * @param con
- * @return error
- */
-rtError
-rtConnection_Dispatch(rtConnection con);
-
-/**
- * Dispatch with a timeout
- * @param con
- * @param timeout
- * return error
- */
-rtError
-rtConnection_TimedDispatch(rtConnection con, int32_t timeout);
+rtConnection_AddDefaultListener(rtConnection con, rtMessageCallback callback, void* closure);
 
 /**
  * Get return address for this connection. 

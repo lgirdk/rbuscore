@@ -77,6 +77,7 @@ struct _rtConnection
   struct sockaddr_storage local_endpoint;
   struct sockaddr_storage remote_endpoint;
   uint8_t*                send_buffer;
+  int                     send_buffer_in_use;
   uint8_t*                recv_buffer;
   int                     recv_buffer_capacity;
   atomic_uint_least32_t   sequence_number;
@@ -84,12 +85,16 @@ struct _rtConnection
   rtConnectionState       state;
   char                    inbox_name[RTMSG_HEADER_MAX_TOPIC_LENGTH];
   struct _rtListener      listeners[RTMSG_LISTENERS_MAX];
-  rtMessage               response;
   pthread_mutex_t         mutex;
   rtList                  pending_requests_list;
-  rtMessageSimpleCallback default_callback;
-  unsigned int            run_dispatch;
-  pthread_t               dispatch_thread;
+  rtList                  callback_message_list;
+  rtMessageCallback       default_callback;
+  void*                   default_closure;
+  unsigned int            run_threads;
+  pthread_t               reader_thread;
+  pthread_t               callback_thread;
+  pthread_mutex_t         callback_message_mutex;
+  pthread_cond_t          callback_message_cond;
 };
 
 typedef struct 
@@ -100,53 +105,25 @@ typedef struct
   rtMessage response;
 }pending_request;
 
-static pid_t g_dispatch_tid;
-static int g_taint_packets = 0; 
-static int rtConnection_StartDispatch(rtConnection con);
-static int rtConnection_StopDispatch(rtConnection con);
+typedef struct _rtCallbackMessage
+{
+  rtMessageHeader hdr;
+  rtMessage msg;
+} rtCallbackMessage;
 
-static void onInboxMessage(rtMessageHeader const* hdr, uint8_t const* p, uint32_t n, void* closure)
+static pid_t g_read_tid;
+static int g_taint_packets = 0; 
+static int rtConnection_StartThreads(rtConnection con);
+static int rtConnection_StopThreads(rtConnection con);
+static void rtCallbackMessage_Free(void* p);
+static rtError rtConnection_Read(rtConnection con, int32_t timeout);
+
+static void onDefaultMessage(rtMessageHeader const* hdr, rtMessage msg, void* closure)
 {
   struct _rtConnection* con = (struct _rtConnection *) closure;
-  if (hdr->flags & rtMessageFlags_Response)
+  if(con->default_callback)
   {
-    if(hdr->flags & rtMessageFlags_Undeliverable)
-    {
-      con->response = NULL;
-    }
-    else
-    {
-      rtMessage_FromBytes(&con->response, p, n);
-    }
-
-    pthread_mutex_lock(&con->mutex);
-    rtListItem listItem;
-    for(rtList_GetFront(con->pending_requests_list, &listItem); 
-        listItem != NULL; 
-        rtListItem_GetNext(listItem, &listItem))
-    {
-      pending_request *entry;
-      rtListItem_GetData(listItem, (void**)&entry);
-      if(entry->sequence_number == hdr->sequence_number)
-      {
-        entry->response = con->response;
-        entry->flags = hdr->flags;
-        con->response = NULL;
-        sem_post(&(entry->sem));
-        break;
-      }
-    }
-    pthread_mutex_unlock(&con->mutex);
-
-    if(NULL != con->response)
-      rtMessage_Release(con->response);
-  }
-  else if(NULL != con->default_callback)
-  {
-    rtMessage msg;
-    rtMessage_FromBytes(&msg, p, n);
-    con->default_callback(hdr, msg);
-    rtMessage_Release(msg);
+    con->default_callback(hdr, msg, con->default_closure);
   }
 }
 
@@ -245,6 +222,7 @@ rtConnection_ConnectAndRegister(rtConnection con)
   return RT_OK;
 }
 
+#if 0
 static rtError
 rtConnection_EnsureRoutingDaemon()
 {
@@ -263,6 +241,7 @@ rtConnection_EnsureRoutingDaemon()
 
   return RT_OK;
 }
+#endif
 
 static rtError
 rtConnection_ReadUntil(rtConnection con, uint8_t* buff, int count, int32_t timeout)
@@ -291,7 +270,7 @@ rtConnection_ReadUntil(rtConnection con, uint8_t* buff, int count, int32_t timeo
     ssize_t n = recv(con->fd, buff + bytes_read, (bytes_to_read - bytes_read), MSG_NOSIGNAL);
     if (n == 0)
     {
-      if(0 != con->run_dispatch)
+      if(0 != con->run_threads)
         rtLog_Error("Failed to read error : %s", rtStrError(rtErrorFromErrno(ENOTCONN)));
       return rtErrorFromErrno(ENOTCONN);
     }
@@ -322,12 +301,15 @@ rtConnection_Create(rtConnection* con, char const* application_name, char const*
   pthread_mutexattr_t mutex_attribute;
   pthread_mutexattr_init(&mutex_attribute);
   pthread_mutexattr_settype(&mutex_attribute, PTHREAD_MUTEX_ERRORCHECK);
-  if( 0 != pthread_mutex_init(&c->mutex, &mutex_attribute))
+  if (0 != pthread_mutex_init(&c->mutex, &mutex_attribute) ||
+      0 != pthread_mutex_init(&c->callback_message_mutex, &mutex_attribute))
   {
-    rtLog_Error("Could not initialize mutex. Cannot create connection.\n");
+    rtLog_Error("Could not initialize mutex. Cannot create connection.");
     free(c);
     return RT_ERROR;
   }
+  pthread_cond_init(&c->callback_message_cond, NULL);
+
   for (i = 0; i < RTMSG_LISTENERS_MAX; ++i)
   {
     c->listeners[i].in_use = 0;
@@ -335,8 +317,7 @@ rtConnection_Create(rtConnection* con, char const* application_name, char const*
     c->listeners[i].callback = NULL;
     c->listeners[i].subscription_id = 0;
   }
-
-  c->response = NULL;
+  c->send_buffer_in_use = 0;
   c->send_buffer = (uint8_t *) malloc(RTMSG_SEND_BUFFER_SIZE);
   c->recv_buffer = (uint8_t *) malloc(RTMSG_SEND_BUFFER_SIZE);
   c->recv_buffer_capacity = RTMSG_SEND_BUFFER_SIZE;
@@ -347,8 +328,9 @@ rtConnection_Create(rtConnection* con, char const* application_name, char const*
   c->application_name = strdup(application_name);
   c->fd = -1;
   rtList_Create(&c->pending_requests_list);
+  rtList_Create(&c->callback_message_list);
   c->default_callback = NULL;
-  c->run_dispatch = 0;
+  c->run_threads = 0;
   memset(c->inbox_name, 0, RTMSG_HEADER_MAX_TOPIC_LENGTH);
   memset(&c->local_endpoint, 0, sizeof(struct sockaddr_storage));
   memset(&c->remote_endpoint, 0, sizeof(struct sockaddr_storage));
@@ -371,10 +353,10 @@ rtConnection_Create(rtConnection* con, char const* application_name, char const*
 
   if (err == RT_OK)
   {
-    rtConnection_AddListener(c, c->inbox_name, onInboxMessage, c);
+    rtConnection_AddListener(c, c->inbox_name, onDefaultMessage, c);
     *con = c;
   }
-  rtConnection_StartDispatch(c);
+  rtConnection_StartThreads(c);
   return err;
 }
 
@@ -384,13 +366,13 @@ rtConnection_Destroy(rtConnection con)
   if (con)
   {
     pthread_mutex_lock(&con->mutex);
-    con->run_dispatch = 0;
+    con->run_threads = 0;
     pthread_mutex_unlock(&con->mutex);
     
     if (con->fd != -1)
       shutdown(con->fd, SHUT_RDWR);
     
-    rtConnection_StopDispatch(con);
+    rtConnection_StopThreads(con);
     
     if (con->fd != -1)
       close(con->fd);
@@ -422,6 +404,7 @@ rtConnection_Destroy(rtConnection con)
       sem_post(&entry->sem);
     }
     rtList_Destroy(con->pending_requests_list,NULL);
+    rtList_Destroy(con->callback_message_list, rtCallbackMessage_Free);
     pthread_mutex_unlock(&con->mutex);
     if(0 != found_pending_requests)
     {
@@ -431,11 +414,16 @@ rtConnection_Destroy(rtConnection con)
     }
 
     pthread_mutex_destroy(&con->mutex);
+
+    pthread_mutex_destroy(&con->callback_message_mutex);
+    pthread_cond_destroy(&con->callback_message_cond);
+
     free(con);
   }
   return 0;
 }
 
+#if 0
 rtError
 rtConnection_SendErrorMessageToCaller(int clnt_fd ,rtMessageHeader const* request_header)
 {
@@ -468,6 +456,7 @@ rtConnection_SendErrorMessageToCaller(int clnt_fd ,rtMessageHeader const* reques
     rtConnection_SendResponse(t_con, &new_header, res, 1000);
     return RT_OK;
 }
+#endif
 
 rtError
 rtConnection_SendMessage(rtConnection con, rtMessage msg, char const* topic)
@@ -540,7 +529,7 @@ rtConnection_SendRequest(rtConnection con, rtMessage const req, char const* topi
   int wait_result;
   uint32_t sequence_number;
   rtListItem listItem;
-  
+
   pid_t tid = syscall(__NR_gettid);
   rtMessage_ToByteArrayWithSize(req, &p, DEFAULT_SEND_BUFFER_SIZE, &n);
   pthread_mutex_lock(&con->mutex);
@@ -549,7 +538,6 @@ rtConnection_SendRequest(rtConnection con, rtMessage const req, char const* topi
 #else
   sequence_number = __sync_fetch_and_add(&con->sequence_number, 1);
 #endif
- 
   /*Populate the pending request and enqueue it.*/
   pending_request queue_entry; 
   queue_entry.sequence_number = sequence_number;
@@ -558,7 +546,6 @@ rtConnection_SendRequest(rtConnection con, rtMessage const req, char const* topi
   queue_entry.response = NULL;
 
   rtList_PushFront(con->pending_requests_list, (void*)&queue_entry, &listItem);
-  
   err = rtConnection_SendInternal(con, topic, p, n, con->inbox_name, rtMessageFlags_Request, sequence_number);
   if (err != RT_OK)
   {
@@ -567,7 +554,7 @@ rtConnection_SendRequest(rtConnection con, rtMessage const req, char const* topi
   }
   pthread_mutex_unlock(&con->mutex);
 
-  if(tid != g_dispatch_tid)
+  if(tid != g_read_tid)
   {
 
     clock_gettime(CLOCK_REALTIME, &until);
@@ -578,7 +565,6 @@ rtConnection_SendRequest(rtConnection con, rtMessage const req, char const* topi
       until.tv_sec += 1;
       until.tv_nsec -= 1000000000L;
     }
-
     wait_result = sem_timedwait(&queue_entry.sem, &until); //TODO: handle wake triggered by signals
   }
   else
@@ -588,7 +574,7 @@ rtConnection_SendRequest(rtConnection con, rtMessage const req, char const* topi
     gettimeofday(&start_time, NULL);
     do
     {
-      if((err = rtConnection_TimedDispatch(con, timeout)) == RT_OK)
+      if((err = rtConnection_Read(con, timeout)) == RT_OK)
       {
         int sem_value = 0;
         sem_getvalue(&queue_entry.sem, &sem_value);
@@ -653,6 +639,9 @@ dequeue_and_return:
   rtList_RemoveItem(con->pending_requests_list, listItem, NULL);
   pthread_mutex_unlock(&con->mutex);
   sem_destroy(&queue_entry.sem);
+
+  if(ret == RT_ERROR_TIMEOUT)
+    rtLog_Info("rtConnection_SendRequest TIMEOUT");
   return ret;
 }
 
@@ -690,10 +679,16 @@ rtConnection_SendInternal(rtConnection con, char const* topic, uint8_t const* bu
   if(1 == g_taint_packets)
     header.flags |= rtMessageFlags_Tainted;
 #endif
+  if(con->send_buffer_in_use)
+    rtLog_Error("send_buffer in use!");
 
+  con->send_buffer_in_use=1;
   err = rtMessageHeader_Encode(&header, con->send_buffer);
   if (err != RT_OK)
+  {
+    con->send_buffer_in_use=0;
     return err;
+  }
 
   struct iovec send_vec[] = {{con->send_buffer, header.header_length}, {(void *)buff, header.payload_length}};
   struct msghdr send_hdr = {NULL, 0, send_vec, 2, NULL, 0, 0};
@@ -714,7 +709,7 @@ rtConnection_SendInternal(rtConnection con, char const* topic, uint8_t const* bu
     }
   }
   while ((err != RT_OK) && (num_attempts++ < max_attempts));
-
+  con->send_buffer_in_use=0;
   return err;
 }
 
@@ -848,17 +843,11 @@ rtConnection_RemoveAlias(rtConnection con, char const* existing, const char *ali
   return 0;
 }
 rtError
-rtConnection_AddDefaultListener(rtConnection con,
-  rtMessageSimpleCallback callback)
+rtConnection_AddDefaultListener(rtConnection con, rtMessageCallback callback, void* closure)
 {
   con->default_callback = callback;
+  con->default_closure = closure;
   return 0;
-}
-
-rtError
-rtConnection_Dispatch(rtConnection con)
-{
-  return rtConnection_TimedDispatch(con, -1);
 }
 
 rtError
@@ -892,17 +881,23 @@ _rtConnection_ReadAndDropBytes(int fd, unsigned int bytes_to_read)
   return RT_OK;
 }
 
-rtError
-rtConnection_TimedDispatch(rtConnection con, int32_t timeout)
+static void rtCallbackMessage_Free(void* p)
 {
-  int i;
+  rtCallbackMessage* dmsg = p;
+  if(dmsg->msg)
+    rtMessage_Release(dmsg->msg);
+  free(dmsg);
+}
+
+rtError
+rtConnection_Read(rtConnection con, int32_t timeout)
+{
   int num_attempts;
   int max_attempts;
   uint8_t const*  itr;
   rtMessageHeader hdr;
   rtError err;
 
-  i = 0;
   num_attempts = 0;
   max_attempts = 4;
 
@@ -929,7 +924,7 @@ rtConnection_TimedDispatch(rtConnection con, int32_t timeout)
     {
       /* Read failed. If this is due to a connection termination initiated by us, break and return. Retry if anything else.*/
       pthread_mutex_lock(&con->mutex);
-      if(0 == con->run_dispatch)
+      if(0 == con->run_threads)
       {
         pthread_mutex_unlock(&con->mutex); //This is a controlled exit. Break the loop.
         break;
@@ -988,20 +983,114 @@ rtConnection_TimedDispatch(rtConnection con, int32_t timeout)
 
   if (err == RT_OK)
   {
+    rtMessage msg = NULL;
+
+    /*create rtMessage if its not an undelivered response*/
+    if (!((hdr.flags & rtMessageFlags_Response) && (hdr.flags & rtMessageFlags_Undeliverable)))
     {
-    for (i = 0; i < RTMSG_LISTENERS_MAX; ++i)
+      rtMessage_FromBytes(&msg, con->recv_buffer + hdr.header_length, hdr.payload_length);
+    }
+
+    if (hdr.flags & rtMessageFlags_Response)
     {
-      if (con->listeners[i].in_use && (con->listeners[i].subscription_id == hdr.control_data))
+      /*response message must be handle right here in this thread
+        because rtConnection_SendRequest is waiting on the response.
+        We do not queue responses into the callback_message_list
+        because this can lead to lock ups such as RDKB-26837
+      */
+      pthread_mutex_lock(&con->mutex);
+      rtListItem listItem;
+      for(rtList_GetFront(con->pending_requests_list, &listItem); 
+          listItem != NULL; 
+          rtListItem_GetNext(listItem, &listItem))
       {
-        rtLog_Debug("found subscription match:%d", i);
-        break;
+        pending_request *entry;
+        rtListItem_GetData(listItem, (void**)&entry);
+        if(entry->sequence_number == hdr.sequence_number)
+        {
+          entry->response = msg;
+          entry->flags = hdr.flags;
+          msg = NULL; /*rtConnection_SendRequest thread will take the message*/
+          sem_post(&(entry->sem));
+          break;
+        }
       }
+      pthread_mutex_unlock(&con->mutex);
     }
-    }
-    if (i < RTMSG_LISTENERS_MAX)
+    else
     {
-      con->listeners[i].callback(&hdr, con->recv_buffer + hdr.header_length, hdr.payload_length,
-        con->listeners[i].closure);
+      /*request message must be dispatched to the listener callback*/
+
+#if DEBUG_CALLBACK_THREAD
+      /*here is an optional way to debug by firing callbacks on this thread*/
+      static int enableCBThread = -1;
+      if(enableCBThread==-1)
+      {
+        FILE *fp = NULL;
+        fp = fopen("/nvram/rtConnection_disableCBThread", "r");
+        if (fp)
+          enableCBThread=0;
+        else
+          enableCBThread=1;
+        rtLog_Error("enableCBThread=%d", enableCBThread);
+      }
+
+      if(enableCBThread)
+      {
+#endif
+        /*send request message to the Callback thread*/
+        rtCallbackMessage* dmsg;
+        rtListItem listItem;
+
+        pthread_mutex_lock(&con->callback_message_mutex);
+
+        rtList_PushBack(con->callback_message_list, rtListReuseData, &listItem);
+        rtListItem_GetData(listItem, (void**)&dmsg);
+        if(!dmsg)
+        {
+          dmsg = malloc(sizeof(rtCallbackMessage));
+          rtListItem_SetData(listItem, dmsg);
+        }
+        dmsg->hdr = hdr;
+        dmsg->msg = msg;
+        msg = NULL; /*the callback thread will take the msg*/
+
+        /*log something if the callback thread isn't processing fast enough*/
+        size_t size;
+        rtList_GetSize(con->callback_message_list, &size);
+        if(size >= 5)
+        {
+          if(size == 5 || size == 10 || size == 20 || size == 40 || size == 80)
+            rtLog_Warn("callback_message_list has reached %d", size);
+          else if(size > 100)
+            rtLog_Error("callback_message_list has reached %d", size);
+        }
+
+        /*wake the callback thread up to process new message*/
+        pthread_cond_signal(&con->callback_message_cond);
+
+        pthread_mutex_unlock(&con->callback_message_mutex);
+#if DEBUG_CALLBACK_THREAD
+      }
+      else
+      {
+        /*handle request message callback on this thread*/
+        int i;
+        for (i = 0; i < RTMSG_LISTENERS_MAX; ++i)
+        {
+          if (con->listeners[i].in_use && (con->listeners[i].subscription_id == hdr.control_data))
+          {
+            con->listeners[i].callback(&hdr, msg, con->listeners[i].closure);
+            break;
+          }
+        }
+      }
+#endif
+    }
+    /*if the message wasn't sent off to another thread then release it*/
+    if(msg)
+    {
+      rtMessage_Release(msg);
     }
   }
 
@@ -1013,65 +1102,168 @@ rtConnection_TimedDispatch(rtConnection con, int32_t timeout)
       rtLog_Fatal("Out of memory to create recv buffer.");
     con->recv_buffer_capacity = RTMSG_SEND_BUFFER_SIZE;
   }
+
   return RT_OK;
 }
+/*
+  RDKB-26837: added rtConnection_CallbackThread to decouple
+  reading message from the socket (what rtConnection_ReaderThread does)
+  from executing the listener callbacks which can block.
+  This prevents rtConnection_ReaderThread from getting blocked by callbacks 
+  so that it can continue to read incoming message.
+  Importantly, it allows rtConnection_ReaderThread to handle Response messages  
+  for threads which have called rtConnection_SendRequest.  In RDKB-26837,
+  rtConnection_ReaderThread was executing a callback directly which
+  blocked on an application mutex being help by another thread
+  attempting to call rtConnection_SendRequest.   Since the reader thread
+  was blocked, it could not read the response message the SendRequest 
+  was waiting on.  
+*/
+static void * rtConnection_CallbackThread(void *data)
+{
+  rtConnection con = (rtConnection)data;
+  rtLog_Info("Callback thread started");
+  while(1 == con->run_threads)
+  {
+    size_t size;
+    rtListItem listItem;
 
-static void * rtConnection_DispatchThread(void *data)
+    pthread_mutex_lock(&con->callback_message_mutex);
+
+    rtList_GetSize(con->callback_message_list, &size);
+
+    if(size == 0)
+    {
+      //rtLog_Error("Callback thread before wait");
+      pthread_cond_wait(&con->callback_message_cond, &con->callback_message_mutex);
+      //rtLog_Error("Callback thread after wait");
+    }
+
+    /*get first item to handle*/
+    rtList_GetFront(con->callback_message_list, &listItem);
+
+    pthread_mutex_unlock(&con->callback_message_mutex);
+
+    /*Execute listener callbacks for all messages in callback_message_list.
+      Remove messages from list as you go and return once the list is empty.
+      Very important to not keep any mutex lock while executing the callback*/
+    while(listItem != NULL)
+    {
+      int i;
+      rtCallbackMessage* dmsg;
+      rtMessageCallback callback = NULL;
+      void* closure;
+
+      rtListItem_GetData(listItem, (void**)&dmsg);
+
+      pthread_mutex_lock(&con->mutex);
+
+      /*check for controlled exit*/
+      if(0 == con->run_threads)
+      {
+        pthread_mutex_unlock(&con->mutex);
+        break;
+      }
+
+      /*find the listener for the msg*/
+      for (i = 0; i < RTMSG_LISTENERS_MAX; ++i)
+      {
+        if (con->listeners[i].in_use && (con->listeners[i].subscription_id == dmsg->hdr.control_data))
+        {
+          callback = con->listeners[i].callback;
+          closure = con->listeners[i].closure;
+          break;
+        }
+      }
+
+      pthread_mutex_unlock(&con->mutex);
+
+      /*process the message without locking any mutex*/
+      if(callback)
+      {
+          //rtLog_Error("rtConnection_CallbackThread before callback");
+          callback(&dmsg->hdr, dmsg->msg, closure);
+          //rtLog_Error("rtConnection_CallbackThread after callback");
+      }
+      else
+      {
+        //rtLog_Error("rtConnection_CallbackThread no callback found for message");
+      }
+
+      rtMessage_Release(dmsg->msg);
+
+      pthread_mutex_lock(&con->callback_message_mutex);
+
+      /*remove item. pass NULL so data can be reused*/
+      rtList_RemoveItem(con->callback_message_list, listItem, NULL);
+
+      /*get next item to handle from front*/
+      rtList_GetFront(con->callback_message_list, &listItem);
+
+      size_t size;
+      rtList_GetSize(con->callback_message_list, &size);
+      //rtLog_Error("Remove callback_message_list size=%d", size);
+
+      pthread_mutex_unlock(&con->callback_message_mutex);
+    }
+  }
+  rtLog_Info("Callback thread exiting");
+  return NULL;
+}
+
+static void * rtConnection_ReaderThread(void *data)
 {
   rtError err = RT_OK;
   rtConnection con = (rtConnection)data;
-  g_dispatch_tid = syscall(__NR_gettid);
-  rtLog_Info("Dispatch thread starts. tid: %d\n", (int)g_dispatch_tid);
-  while(1 == con->run_dispatch)
+  g_read_tid = syscall(__NR_gettid);
+  rtLog_Info("Reader thread started");
+  while(1 == con->run_threads)
   {
-    if((err = rtConnection_Dispatch(con)) != RT_OK)
+    if((err = rtConnection_Read(con, -1)) != RT_OK)
     {
-
       pthread_mutex_lock(&con->mutex);
-      if(0 == con->run_dispatch)
+      if(0 == con->run_threads)
       {
         pthread_mutex_unlock(&con->mutex); //This is a controlled exit. Break the loop.
         break;
       }
       else
         pthread_mutex_unlock(&con->mutex);
-      rtLog_Error("Dispatch failed with error 0x%x.\n", err);
+      rtLog_Error("Reader failed with error 0x%x.", err);
       sleep(5); //Avoid tight loops if we have an unrecoverable situation.
     }
   }
-
-  rtLog_Info("Exiting dispatch thread.\n");
+  rtLog_Info("Reader thread exiting");
   return NULL;
 }
 
-static int rtConnection_StartDispatch(rtConnection con)
+static int rtConnection_StartThreads(rtConnection con)
 {
   int ret = 0;
-  if(0 == con->run_dispatch)
+  if(0 == con->run_threads)
   {
-    con->run_dispatch = 1;
-    if(0 != pthread_create(&con->dispatch_thread, NULL, rtConnection_DispatchThread, (void *)con))
+    con->run_threads = 1;
+    if(0 != pthread_create(&con->reader_thread, NULL, rtConnection_ReaderThread, (void *)con))
     {
-      rtLog_Error("Unable to launch dispatch thread.\n");
+      rtLog_Error("Unable to launch reader thread.");
       ret = RT_ERROR;
     }
-    else
+
+    if(0 != pthread_create(&con->callback_thread, NULL, rtConnection_CallbackThread, (void *)con))
     {
-      rtLog_Info("Launched dispatch thread.\n");
+      rtLog_Error("Unable to launch callback thread.");
+      ret = RT_ERROR;
     }
-  }
-  else
-  {
-    /* Do nothing. Dispatch thread is already running.*/
   }
   return ret;
 }
 
-static int rtConnection_StopDispatch(rtConnection con)
+static int rtConnection_StopThreads(rtConnection con)
 {
-  rtLog_Info("Stopping dispatch.\n");
-  con->run_dispatch = 0;
-  pthread_join(con->dispatch_thread, NULL);
+  rtLog_Info("Stopping threads");
+  con->run_threads = 0;
+  pthread_join(con->reader_thread, NULL);
+  pthread_join(con->callback_thread, NULL);
   return 0;
 }
 

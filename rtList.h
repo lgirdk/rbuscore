@@ -30,6 +30,8 @@ typedef struct _rtListItem* rtListItem;
 
 typedef void (*rtList_Cleanup)(void *);
 
+extern void* rtListReuseData;
+
 rtError rtList_Create(rtList* plist);
 rtError rtList_Destroy(rtList list, rtList_Cleanup destroyer);
 rtError rtList_PushFront(rtList list, void* data, rtListItem* pitem);

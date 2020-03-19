@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <memory.h>
 
+void* rtListReuseData = NULL+1;
+
 struct _rtListItem
 {
   void* data;
@@ -44,17 +46,18 @@ static rtListItem rtList_GetFreeItem(rtList list)
   {
     item = list->free;
     list->free = list->free->next;
+    /*do not NULL item->data as the user may want to reuse it*/
   }
   else
   {
     item = (rtListItem)malloc(sizeof(struct _rtListItem));
+    item->data = NULL;
   }
   return item;
 }
 
 static void rtList_SetFreeItem(rtList list, rtListItem item)
 {
-  item->data = NULL;
   if(list->free)
   {
     list->free->prev = item;
@@ -108,6 +111,8 @@ rtError rtList_Destroy(rtList list, rtList_Cleanup destroyer)
     item = list->free;
     do
     {
+      if (destroyer && item->data)
+        destroyer(item->data);
       next = item->next;
       free(item);
       item = next;
@@ -124,7 +129,8 @@ rtError rtList_PushFront(rtList list, void* data, rtListItem* pitem)
   RT_CHECK_INVALID_ARG(list);
   item = rtList_GetFreeItem(list);
   RT_CHECK_NO_MEM(item);
-  item->data = data;
+  if(data != rtListReuseData)
+    item->data = data;
   item->prev = NULL;
   item->next = list->front;
   if(list->front)
@@ -145,7 +151,8 @@ rtError rtList_PushBack(rtList list, void* data, rtListItem* pitem)
   RT_CHECK_INVALID_ARG(list);
   item = rtList_GetFreeItem(list);
   RT_CHECK_NO_MEM(item);
-  item->data = data;
+  if(data != rtListReuseData)
+    item->data = data;
   item->next = NULL;
   item->prev = list->back;
   if(list->back)
@@ -167,7 +174,8 @@ rtError rtList_InsertBefore(rtList list, void* data, rtListItem at, rtListItem* 
   RT_CHECK_INVALID_ARG(at);
   item = rtList_GetFreeItem(list);
   RT_CHECK_NO_MEM(item);
-  item->data = data;
+  if(data != rtListReuseData)
+    item->data = data;
   item->next = at;
   item->prev = at->prev;
   at->prev = item;
@@ -189,7 +197,8 @@ rtError rtList_InsertAfter(rtList list, void* data, rtListItem at, rtListItem* p
   RT_CHECK_INVALID_ARG(at);
   item = rtList_GetFreeItem(list);
   RT_CHECK_NO_MEM(item);
-  item->data = data;
+  if(data != rtListReuseData)
+    item->data = data;
   item->next = at->next;
   item->prev = at;
   at->next = item;
@@ -214,8 +223,11 @@ rtError rtList_RemoveItem(rtList list, rtListItem item, rtList_Cleanup destroyer
     list->front = item->next;
   if(list->back == item)
     list->back = item->prev;
-  if(destroyer)
+  if(destroyer && item->data)
+  {
     destroyer(item->data);
+    item->data = NULL;
+  }
   rtList_SetFreeItem(list, item);
   list->size--;
   return RT_OK;
@@ -319,7 +331,24 @@ void printListFor(rtList list)
   }
   printFreeList(list);
 }
+void printListString(rtList list)
+{
+  rtListItem item;
+  size_t sz;
+  void* data;
 
+  rtList_GetSize(list, &sz);
+  printf("list size=%lu\n", sz);
+
+  for(rtList_GetFront(list, &item); 
+      item != NULL; 
+      rtListItem_GetNext(item, &item))
+  {
+    rtListItem_GetData(item, &data);
+    printf("data=%s\n", (char*)data);
+  }
+  printFreeListString(list);
+}
 int gUseFor = 0;
 void printList(rtList list)
 {
@@ -341,14 +370,33 @@ int printFreeList(rtList list)
   }
   printf("free list size=%lu\n", sz);  
 }
-
+int printFreeListString(rtList list)
+{
+  rtListItem item;
+  size_t sz = 0;
+  item = list->free;
+  while(item)
+  {
+    sz++;
+    printf("free list data=%s\n", (char*)item->data);
+    item = item->next;
+  }
+  printf("free list size=%lu\n", sz);  
+}
+void freeString(void* s)
+{
+  free(s);
+}
 int main(int argc, char* argv[])
 {
   rtList list;
   rtListItem items[6];
   rtListItem item, next;
   void* data;
+  char* sdata;
   int i;
+
+  rtListReuseData=(void*)-1;
 
   for(i = 1; i < argc; ++i)
     if(!strcmp(argv[i], "--for"))
@@ -414,6 +462,56 @@ int main(int argc, char* argv[])
 
   printf("destroy list\n"); 
   rtList_Destroy(list, NULL);
+
+  /*exercise reusability*/
+  printf("testing reusability\n"); 
+  rtList_Create(&list);
+  sdata = malloc(10); strncpy(sdata, "one", 10);
+  rtList_PushBack(list, sdata, &items[0]);
+  sdata = malloc(10); strncpy(sdata, "two", 10);
+  rtList_PushBack(list, sdata, &items[1]);
+  sdata = malloc(10); strncpy(sdata, "three", 10);
+  rtList_PushBack(list, sdata, &items[2]);
+  printf("list should contain one, two, three. free list empty\n");
+  printListString(list);
+  rtList_RemoveItem(list, items[0], NULL);
+  rtList_RemoveItem(list, items[1], NULL);
+  printf("list should contain three. free list one, two\n");
+  printListString(list);
+  rtList_PushBack(list, rtListReuseData, &items[0]);
+  rtList_PushBack(list, rtListReuseData, &items[1]);
+  rtList_PushBack(list, rtListReuseData, &items[3]);
+  rtList_PushBack(list, rtListReuseData, &items[4]);
+  printf("list should contain one, two, three, null, null. free list empty\n");
+  printListString(list);
+  rtList_RemoveItem(list, items[4], NULL);
+  rtList_RemoveItem(list, items[3], freeString);
+  rtList_PushBack(list, rtListReuseData, &items[3]);
+  rtList_PushBack(list, rtListReuseData, &items[4]);
+  printf("list should contain one, two, three, null, null. free list empty\n");
+  printListString(list);
+  printf("setting all data\n");
+  for(i=0; i<5; i++)
+  {
+    char buff[10];
+    void* data;
+    printf("getting data for %p\n", items[i]->data);
+    rtListItem_GetData(items[i], &data);
+    if(data)
+    {
+      printf("got data: %s\n", (char*)data);
+    }
+    else
+    {
+      printf("got data null\n");
+      data = malloc(10);
+      rtListItem_SetData(items[i], data);
+    }
+    snprintf(buff, 10, "item %d", i);
+    strncpy((char*)data, buff, 10);
+  }
+  printListString(list);
+  rtList_Destroy(list, freeString);
 
   return 0;
 }

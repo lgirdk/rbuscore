@@ -25,16 +25,14 @@
 #include <string.h>
 #include <unistd.h>
 
-void onMessage(rtMessageHeader const* hdr, uint8_t const* buff, uint32_t n, void* closure)
+void onMessage(rtMessageHeader const* hdr, rtMessage m, void* closure)
 {
   char* s;
   char* itemstring;
   uint32_t num;
+  uint32_t n;
 
   (void) closure;
-
-  rtMessage m;
-  rtMessage_FromBytes(&m, buff, n);
 
   rtMessage item;
   rtMessage_Create(&item);
@@ -48,12 +46,10 @@ void onMessage(rtMessageHeader const* hdr, uint8_t const* buff, uint32_t n, void
 
   free(s);
   free(itemstring);
-  rtMessage_Release(m);
 }
 
 int main()
 {
-  rtError err;
   rtConnection con;
 
   rtLog_SetLevel(RT_LOG_INFO);
@@ -64,10 +60,7 @@ int main()
 
   while (1)
   {
-    err = rtConnection_Dispatch(con);
-    rtLog_Info("dispatch:%s", rtStrError(err));
-    if (err != RT_OK)
-      sleep(1);
+    sleep(1);
   }
 
   rtConnection_Destroy(con);
