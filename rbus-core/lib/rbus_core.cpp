@@ -322,36 +322,27 @@ static void dispatch_method_call(rtMessage msg, const rtMessageHeader *hdr, rbus
         }
         rtMessage_Release(response);
     }
-    rtMessage_Release(msg);
 }
 
-static void onMessage(rtMessageHeader const* hdr, uint8_t const* raw_buffer, uint32_t size, void* closure)
+static void onMessage(rtMessageHeader const* hdr, rtMessage msg, void* closure)
 {
     using namespace rbus_server;
     static int stack_counter = 0;
     stack_counter++;
-    rtMessage msg;
     rtError err = RT_OK;
     rbus_object * ptr = (rbus_object *)closure;
 
-    if((err = rtMessage_FromBytes(&msg, raw_buffer, size)) != RT_OK)
+    if(1 != stack_counter)
     {
-        rtLog_Error("Cannot convert raw buffer to rtMessage.");
+        //We're in the midst of handling another request. Queue this one for later.
+        queued_request * req = new queued_request;
+        req->hdr = *hdr;
+        req->msg = msg;
+        req->obj = ptr;
+        request_queue.push_back(req);
     }
     else
-    {
-        if(1 != stack_counter)
-        {
-            //We're in the midst of handling another request. Queue this one for later.
-            queued_request * req = new queued_request;
-            req->hdr = *hdr;
-            req->msg = msg;
-            req->obj = ptr;
-            request_queue.push_back(req);
-        }
-        else
-            dispatch_method_call(msg, hdr, ptr);
-    }
+        dispatch_method_call(msg, hdr, ptr);
 
     if((1 == stack_counter) && !request_queue.empty())
     {
@@ -1125,12 +1116,13 @@ rbus_error_t rbus_unregisterEvent(const char* object_name, const char * event)
     unlock();
     return ret;
 }
-static void master_event_callback(const rtMessageHeader* hdr, rtMessage msg)
+static void master_event_callback(const rtMessageHeader* hdr, rtMessage msg, void* closure)
 {
     using namespace rbus_client;
     const char * sender = hdr->reply_topic;
     const char * event_name = NULL;
     rtError err;
+    (void)closure;
     
     /*Sanitize the incoming data.*/
     if(MAX_OBJECT_NAME_LENGTH <= strlen(sender))
@@ -1239,7 +1231,7 @@ rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event
     if(false == g_run_event_client_dispatch)
     {
         rtLog_Info("Starting event dispatching.");
-        rtConnection_AddDefaultListener(g_connection, &master_event_callback);
+        rtConnection_AddDefaultListener(g_connection, &master_event_callback, NULL);
         g_run_event_client_dispatch = true;
     }
 

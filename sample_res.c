@@ -23,12 +23,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-void onMessage(rtMessageHeader const* hdr, uint8_t const* buff, uint32_t n, void* closure)
+void onMessage(rtMessageHeader const* hdr, rtMessage req, void* closure)
 {
   rtConnection con = (rtConnection) closure;
-
-  rtMessage req;
-  rtMessage_FromBytes(&req, buff, n);
 
   if (rtMessageHeader_IsRequest(hdr))
   {
@@ -46,8 +43,6 @@ void onMessage(rtMessageHeader const* hdr, uint8_t const* buff, uint32_t n, void
     rtConnection_SendResponse(con, hdr, res, 1000);
     rtMessage_Release(res);
   }
-
-  rtMessage_Release(req);
 
   rtLog_Info("flags     :%d", hdr->flags);
   rtLog_Info("is_request:%d", rtMessageHeader_IsRequest(hdr));
