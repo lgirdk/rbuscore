@@ -46,7 +46,9 @@
 #include "routing_tree.h"
 #include "rtm_discovery_api.h"
 #include "local_benchmarking.h"
-
+#ifdef INCLUDE_BREAKPAD
+#include "breakpad_wrapper.h"
+#endif
 #ifndef SOL_TCP
 #define SOL_TCP 6
 #endif
@@ -988,7 +990,9 @@ int main(int argc, char* argv[])
 
   run_in_foreground = 0;
   use_no_delay = 1;
-
+#ifdef INCLUDE_BREAKPAD
+      breakpad_ExceptionHandler();
+#endif
   rtLog_SetLevel(RT_LOG_INFO);
   rtVector_Create(&clients);
   rtVector_Create(&listeners);

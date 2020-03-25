@@ -56,6 +56,8 @@ endif
 
 CFLAGS+=-Werror -Wall -Wextra -DRT_PLATFORM_LINUX -I. -fPIC
 LDFLAGS=-L. -pthread
+LDFLAGS += " -lbreakpadwrapper -lpthread -lstdc++"
+CFLAGS += " -DINCLUDE_BREAKPAD"
 OBJDIR=obj
 
 RTMSG_OBJS:=$(patsubst %.c, %.o, $(notdir $(RTMSG_SRCS)))
@@ -77,7 +79,7 @@ librtMessaging.so: $(RTMSG_OBJS)
 	$(CC_PRETTY) $(RTMSG_OBJS) $(LDFLAGS) -LcJSON -lcjson -shared -o $@
 
 rtrouted: rtrouted.c
-	$(CC_PRETTY) $(CFLAGS) rtrouted.c -o rtrouted -L. -lrtMessaging -LcJSON -lcjson
+	$(CC_PRETTY) $(CFLAGS) $(LDFLAGS) rtrouted.c -o rtrouted -L. -lrtMessaging -LcJSON -lcjson
 
 sample_send: librtMessaging.so sample_send.c
 	$(CC_PRETTY) $(CFLAGS) sample_send.c -L. -lrtMessaging -o sample_send -LcJSON -lcjson
