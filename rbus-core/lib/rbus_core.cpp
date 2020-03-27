@@ -636,6 +636,12 @@ rbus_error_t rbus_registerMethod(const char * object_name, const char *method, r
             int j;
             for(j = 0; j < MAX_SUPPORTED_METHODS; j++)
             {
+                if(0 == strncmp(method, obj->method_callbacks[j].method.c_str(), MAX_METHOD_NAME_LENGTH))
+                {
+                   unlock();
+                   rtLog_Error("Method %s is already registered,Rejecting duplicate registration.", method);
+                   return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+                }
                 if(true == obj->method_callbacks[j].method.empty())
                 {
                     obj->method_callbacks[j].method = method;
@@ -1049,6 +1055,11 @@ rbus_error_t rbus_registerEvent(const char* object_name, const char * event, rbu
 
     if(NULL == event)
         event = DEFAULT_EVENT;
+    if((NULL == object_name) || (NULL == callback))
+    {
+        rtLog_Error("Invalid parameter(s)");
+        return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+    }
 
     lock();
     rbus_object *obj = get_object(object_name);

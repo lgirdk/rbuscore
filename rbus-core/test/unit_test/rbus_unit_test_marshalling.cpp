@@ -428,13 +428,13 @@ TEST_F(TestMarshallingAPIs, rbus_AppendString_test6)
     EXPECT_EQ(err, RT_OK) << "rtMessage call failed";
 }
 
-TEST_F(TestMarshallingAPIs, DISABLED_rbus_AddString_test1)
+TEST_F(TestMarshallingAPIs, rbus_AddString_test1)
 {
     rtMessage testMessage;
     rtError err = RT_OK;
     char tag[] = "string_field";
     char value[] = "string value 1";
-    const char* messageString = "{\"string_field\":[\"string value 1\"]}";
+    const char* messageString = "\"string value 1\"";
     err = rtMessage_Create(&testMessage);
     EXPECT_EQ(err, RT_OK) << "rtMessage call failed";
 
@@ -445,14 +445,14 @@ TEST_F(TestMarshallingAPIs, DISABLED_rbus_AddString_test1)
     EXPECT_EQ(err, RT_OK) << "rtMessage call failed";
 }
 
-TEST_F(TestMarshallingAPIs, DISABLED_rbus_AddString_test2)
+TEST_F(TestMarshallingAPIs, rbus_AddString_test2)
 {
     rtMessage testMessage;
     rtError err = RT_OK;
     char tag[] = "string_field";
     char value1[] = "string value 1";
     char value2[] = "string value 2";
-    const char* messageString = "{\"string_field\":[\"string value 1\",\"string value 2\"]}";
+    const char* messageString = "\"string value 1\" \"string value 2\"";
     err = rtMessage_Create(&testMessage);
     EXPECT_EQ(err, RT_OK) << "rtMessage call failed";
 
@@ -465,7 +465,7 @@ TEST_F(TestMarshallingAPIs, DISABLED_rbus_AddString_test2)
     EXPECT_EQ(err, RT_OK) << "rtMessage call failed";
 }
 
-TEST_F(TestMarshallingAPIs, DISABLED_rbus_AddString_test3)
+TEST_F(TestMarshallingAPIs, rbus_AddString_test3)
 {
     rtMessage testMessage;
     rtError err = RT_OK;
@@ -473,7 +473,7 @@ TEST_F(TestMarshallingAPIs, DISABLED_rbus_AddString_test3)
     char value1[] = "string value 1";
     char value2[] = "string value 2";
     char value3[] = "string value 3";
-    const char* messageString = "{\"string_field\":[\"string value 1\",\"string value 2\",\"string value 3\"]}";
+    const char* messageString="\"string value 1\" \"string value 2\" \"string value 3\"";
     err = rtMessage_Create(&testMessage);
     EXPECT_EQ(err, RT_OK) << "rtMessage call failed";
 
@@ -516,7 +516,7 @@ TEST_F(TestMarshallingAPIs, rbus_GetStringItem_test1)
     EXPECT_EQ(err, RT_OK) << "rtMessage call failed";
 }
 
-TEST_F(TestMarshallingAPIs, DISABLED_rbus_GetArrayLength_test1)
+TEST_F(TestMarshallingAPIs, rbus_GetArrayLength_test1)
 {
     rtMessage testMessage;
     rtError err = RT_OK;
@@ -535,7 +535,7 @@ TEST_F(TestMarshallingAPIs, DISABLED_rbus_GetArrayLength_test1)
     err = rbus_AddString(testMessage, tag, value3);
     EXPECT_EQ(err, RT_OK) << "rbus call failed";
     err = rbus_GetArrayLength(testMessage, tag, &arrayLength);
-    EXPECT_EQ(err, RT_OK) << "rbus call failed";
+    EXPECT_EQ(err, RT_OK) << "rbus to get arraylength call failed";
     EXPECT_EQ(arrayLength, 3) << "GetArrayLength failed";
     err = rtMessage_Release(testMessage);
     EXPECT_EQ(err, RT_OK) << "rtMessage call failed";
@@ -891,14 +891,14 @@ TEST_F(TestMarshallingAPIs, rbus_AppendBinaryData_test1)
     EXPECT_EQ(err, RT_OK) << "rtMessage call failed";
 }
 
-TEST_F(TestMarshallingAPIs, DISABLED_rbus_SetMessage_test1)
+TEST_F(TestMarshallingAPIs, rbus_SetMessage_test1)
 {
     rtMessage childMessage;
     rtMessage parentMessage;
     char parentTag[] = "parent_field";
     char tag[] = "child_field";
     char value[] = "TestString1";
-    const char* messageString = "{\"parent_field\":{\"child_field\":\"TestString1\"}}";
+    const char* messageString = "\"TestString1\"";
 
     rtMessage_Create(&childMessage);
     rbus_SetString(childMessage, tag, value);
@@ -912,7 +912,7 @@ TEST_F(TestMarshallingAPIs, DISABLED_rbus_SetMessage_test1)
     rtMessage_Release(parentMessage);
 }
 
-TEST_F(TestMarshallingAPIs, DISABLED_rbus_GetMessage_test1)
+TEST_F(TestMarshallingAPIs, rbus_GetMessage_test1)
 {
     rtMessage childMessage;
     rtMessage parentMessage;
@@ -920,7 +920,7 @@ TEST_F(TestMarshallingAPIs, DISABLED_rbus_GetMessage_test1)
     char parentTag[] = "parent_field";
     char tag[] = "child_field";
     char value[] = "TestString1";
-    const char* messageString = "{\"child_field\":\"TestString1\"}";
+    const char* messageString = "\"TestString1\"";
 
     rtMessage_Create(&childMessage);
     rbus_SetString(childMessage, tag, value);
@@ -936,7 +936,7 @@ TEST_F(TestMarshallingAPIs, DISABLED_rbus_GetMessage_test1)
     rtMessage_Release(parentMessage);
 }
 
-TEST_F(TestMarshallingAPIs, DISABLED_rbus_AddMessage_test1)
+TEST_F(TestMarshallingAPIs, rbus_AddMessage_test1)
 {
     rtMessage childMessage1;
     rtMessage childMessage2;
@@ -946,7 +946,7 @@ TEST_F(TestMarshallingAPIs, DISABLED_rbus_AddMessage_test1)
     char tag2[] = "child_field2";
     char value1[] = "TestString1";
     char value2[] = "TestString2";
-    const char* messageString = "{\"parent_field\":[{\"child_field1\":\"TestString1\"},{\"child_field2\":\"TestString2\"}]}";
+    const char* messageString = "\"TestString1\" \"TestString2\"";
 
     rtMessage_Create(&childMessage1);
     rbus_SetString(childMessage1, tag1, value1);
@@ -964,7 +964,7 @@ TEST_F(TestMarshallingAPIs, DISABLED_rbus_AddMessage_test1)
     rtMessage_Release(parentMessage);
 }
 
-TEST_F(TestMarshallingAPIs, DISABLED_rbus_GetMessageItem_test1)
+TEST_F(TestMarshallingAPIs, rbus_GetMessageItem_test1)
 {
     rtMessage childMessage1;
     rtMessage childMessage2;
@@ -975,8 +975,8 @@ TEST_F(TestMarshallingAPIs, DISABLED_rbus_GetMessageItem_test1)
     char tag2[] = "child_field2";
     char value1[] = "TestString1";
     char value2[] = "TestString2";
-    const char* messageString1 = "{\"child_field1\":\"TestString1\"}";
-    const char* messageString2 = "{\"child_field2\":\"TestString2\"}";
+    const char* messageString1 = "\"TestString1\"";
+    const char* messageString2 = "\"TestString2\"";
 
     rtMessage_Create(&childMessage1);
     rbus_SetString(childMessage1, tag1, value1);

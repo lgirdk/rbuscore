@@ -803,7 +803,48 @@ TEST_F(StressTestServer, rbus_addElement_test1)
     }
 }
 
-TEST_F(StressTestServer, DISABLED_rbus_removeElement_test1)
+TEST_F(StressTestServer, rbus_GetElementsAddedByObject_test1)
+{
+    int counter = 5, i = 0;
+    char client_name[] = "TEST_CLIENT_1";
+    char server_obj[] = "test_server_5.obj1";
+    char server_element[] = "test.1.box1";
+    bool conn_status = false;
+    rtError err = RT_OK;
+    rtMessage response;
+    const char* resultValue = NULL;
+    char tag[] = "expression";
+
+    pid_t pid = fork();
+
+    if(pid == 0)
+    {
+        CREATE_RBUS_SERVER_INSTANCE(counter);
+        err = rbus_addElement(server_obj,server_element);
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_addElement failed";
+        printf("********** SERVER ENTERING PAUSED STATE******************** \n");
+        pause();
+    }
+    else if (pid > 0)
+    {
+        sleep(2);
+        conn_status = OPEN_BROKER_CONNECTION(client_name);
+        err = rbus_GetElementsAddedByObject("test.",&response);
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_GetElementsAddedByObject failed";
+
+       if(conn_status)
+           CLOSE_BROKER_CONNECTION();
+
+        kill(pid,SIGTERM);
+        printf("Stoping server instance from createServer test\n");
+    }
+    else
+    {
+        printf("fork failed.\n");
+    }
+}
+
+TEST_F(StressTestServer, rbus_removeElement_test1)
 {
     int counter = 4, i = 0;
     char client_name[] = "TEST_CLIENT_1";
@@ -832,8 +873,8 @@ TEST_F(StressTestServer, DISABLED_rbus_removeElement_test1)
 
         for(i = 0; i < 100; i++)
         {
-            RBUS_PUSH_OBJECT(test_string, server_element, RTMESSAGE_BUS_ERROR_REMOTE_TIMED_OUT);
-            RBUS_PULL_OBJECT(test_string, server_element, RTMESSAGE_BUS_ERROR_REMOTE_TIMED_OUT);
+            RBUS_PUSH_OBJECT(test_string, server_element, RTMESSAGE_BUS_ERROR_DESTINATION_UNREACHABLE);
+            RBUS_PULL_OBJECT(test_string, server_element, RTMESSAGE_BUS_ERROR_DESTINATION_UNREACHABLE);
         }
 
         if(conn_status)

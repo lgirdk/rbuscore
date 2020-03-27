@@ -421,14 +421,14 @@ TEST_F(MultipleServerTest, rbus_multipleServer_test4)
         }
     }
 }
-TEST_F(MultipleServerTest, DISABLED_rbus_multipleServer_test5)
+TEST_F(MultipleServerTest, rbus_multipleServer_test5)
 {
     int counter = 1, i = 1, j = 1;
     char client_name[] = "TEST_CLIENT_1";
     bool conn_status = false;
     char name_buf[100];
     char data_buf[100];
-    int server_count = 50;
+    int server_count = 20;
     int object_count = 3;
     pid_t pid[server_count];
     bool is_parent = true;
