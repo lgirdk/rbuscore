@@ -48,6 +48,20 @@ static bool RBUS_OPEN_BROKER_CONNECTION(char* server_name, rbus_error_t expected
     return result;
 }
 
+static bool RBUS_OPEN_BROKER_CONNECTION2(char* server_name,const char * broker_address,rbus_error_t expected_status)
+{
+    bool result = false;
+    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
+
+    if((err = rbus_openBrokerConnection2(server_name,broker_address)) == RTMESSAGE_BUS_SUCCESS)
+    {
+         printf("Successfully connected to bus.\n");
+         result = true;
+    }
+    EXPECT_EQ(err, expected_status) << "rbus_openBrokerConnection2 failed";
+    return result;
+}
+
 static bool RBUS_CLOSE_BROKER_CONNECTION(rbus_error_t expected_status)
 {
     bool result = false;
@@ -166,10 +180,8 @@ TEST_F(TestServer, rbus_openBrokerConnection_test2)
 {
     char server_name[20] = "test_server_2";
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-
     if(RBUS_OPEN_BROKER_CONNECTION(server_name, RTMESSAGE_BUS_SUCCESS))
     {
-
         err = rbus_openBrokerConnection(server_name);
         EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
 
@@ -190,6 +202,52 @@ TEST_F(TestServer, rbus_openBrokerConnection_test3)
         EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
 
         err = rbus_openBrokerConnection(server_name2);
+        EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
+
+        RBUS_CLOSE_BROKER_CONNECTION(RTMESSAGE_BUS_SUCCESS);
+    }
+    return;
+}
+
+TEST_F(TestServer, rbus_openBrokerConnection2_test1)
+{
+    char server_name[20] = "test_server_";
+    const char * broker_address = "unix:///tmp/rtrouted";
+
+    if(RBUS_OPEN_BROKER_CONNECTION2(server_name,broker_address,RTMESSAGE_BUS_SUCCESS))
+        RBUS_CLOSE_BROKER_CONNECTION(RTMESSAGE_BUS_SUCCESS);
+    return;
+}
+
+TEST_F(TestServer, rbus_openBrokerConnection2_test2)
+{
+    const char * broker_address = "unix:///tmp/rtrouted";
+
+    if(RBUS_OPEN_BROKER_CONNECTION2(NULL,broker_address,RTMESSAGE_BUS_ERROR_INVALID_PARAM))
+        RBUS_CLOSE_BROKER_CONNECTION(RTMESSAGE_BUS_SUCCESS);
+        return;
+}
+
+TEST_F(TestServer, rbus_openBrokerConnection2_test3)
+{
+    char server_name[20] = "test_server_";
+    const char * broker_address = "";
+
+    if(RBUS_OPEN_BROKER_CONNECTION2(server_name,broker_address,RTMESSAGE_BUS_ERROR_GENERAL))
+        RBUS_CLOSE_BROKER_CONNECTION(RTMESSAGE_BUS_SUCCESS);
+        return;
+}
+
+TEST_F(TestServer, rbus_openBrokerConnection2_test4)
+{
+    char server_name[20] = "test_server_2";
+    const char * broker_address = "unix:///tmp/rtrouted";
+    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
+
+    if(RBUS_OPEN_BROKER_CONNECTION2(server_name,broker_address,RTMESSAGE_BUS_SUCCESS))
+    {
+
+        err = rbus_openBrokerConnection2(server_name,broker_address);
         EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
 
         RBUS_CLOSE_BROKER_CONNECTION(RTMESSAGE_BUS_SUCCESS);
@@ -298,11 +356,11 @@ TEST_F(TestServer, rbus_registerObjNameCheck_test2)
     return;
 }
 
-/*Boundary testing for MAX_OBJECT_NAME_LENGTH - 512*/
+/*Boundary testing for MAX_OBJECT_NAME_LENGTH - 128*/
 TEST_F(TestServer, rbus_registerObjNameCheck_test3)
 {
     int counter = 1;
-    char obj_name[513] = "0";
+    char obj_name[129] = "0";
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
 
     CREATE_RBUS_SERVER_REG_OBJECT(counter);
@@ -313,11 +371,11 @@ TEST_F(TestServer, rbus_registerObjNameCheck_test3)
     return;
 }
 
-/*Boundary testing for MAX_OBJECT_NAME_LENGTH - 512*/
+/*Boundary testing for MAX_OBJECT_NAME_LENGTH - 128*/
 TEST_F(TestServer, rbus_registerObjNameCheck_test4)
 {
     int counter = 1;
-    char obj_name[512] = "0";
+    char obj_name[128] = "0";
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
 
     CREATE_RBUS_SERVER_REG_OBJECT(counter);
@@ -328,11 +386,11 @@ TEST_F(TestServer, rbus_registerObjNameCheck_test4)
     return;
 }
 
-/*Boundary testing for MAX_OBJECT_NAME_LENGTH - 512*/
+/*Boundary testing for MAX_OBJECT_NAME_LENGTH - 128*/
 TEST_F(TestServer, rbus_registerObjNameCheck_test5)
 {
     int counter = 1;
-    char obj_name[512] = "0";
+    char obj_name[129] = "0";
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
 
     CREATE_RBUS_SERVER_REG_OBJECT(counter);
@@ -589,7 +647,7 @@ TEST_F(TestServer, rbus_registerMethod_test5)
     return;
 }
 
-TEST_F(TestServer, DISABLED_rbus_registerMethod_test6)
+TEST_F(TestServer, rbus_registerMethod_test6)
 {
     int counter = 1;
     char obj_name[20] = "test_server_1.obj1";
@@ -610,7 +668,7 @@ TEST_F(TestServer, DISABLED_rbus_registerMethod_test6)
     return;
 }
 
-TEST_F(TestServer, DISABLED_rbus_registerMethod_test7)
+TEST_F(TestServer, rbus_registerMethod_test7)
 {
     int counter = 1;
     char obj_name[20] = "test_server_1.obj1";
@@ -807,7 +865,7 @@ TEST_F(TestServer, rbus_registerMethodTable_test5)
 }
 
 /*Registering 32 methods using rbus_registerMethodTable with duplicate method names added in between*/
-TEST_F(TestServer, DISABLED_rbus_registerMethodTable_test6)
+TEST_F(TestServer, rbus_registerMethodTable_test6)
 {
     int counter = 1;
     char obj_name[20] = "test_server_1.obj1";

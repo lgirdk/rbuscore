@@ -30,7 +30,11 @@ else ()
     add_dependencies(rbus_test_server rbus-core)
     target_link_libraries(rbus_test_server rbus-core)
 
-    enable_testing()
+    add_executable(rbus_event_server rbus_test_util.cpp rbus_event_server.cpp)
+    add_dependencies(rbus_event_server rbus-core)
+    target_link_libraries(rbus_event_server rbus-core)
+
+   enable_testing()
     include_directories(${GTEST_INCLUDE_DIR})
 
     add_executable(rbus_unit_test_app
@@ -42,7 +46,9 @@ else ()
                    rbus_unit_test_multiple_objects.cpp
                    rbus_unit_test_multiple_servers.cpp
                    rbus_unit_test_nested_servers.cpp
-                   rbus_unit_test_app.cpp)
+                   rbus_unit_test_app.cpp
+                   rbus_unit_test_event_client.cpp
+                   rbus_unit_test_event_server.cpp)
     add_dependencies(rbus_unit_test_app rbus-core)
     target_link_libraries(rbus_unit_test_app rbus-core
                                            gtest)

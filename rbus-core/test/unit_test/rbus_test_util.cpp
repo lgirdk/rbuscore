@@ -81,6 +81,7 @@ int handle_set1(const char * destination, const char * method, rtMessage request
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
     return 0;
 }
+
 int handle_get2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
 {
     (void) request;
@@ -88,8 +89,9 @@ int handle_get2(const char * destination, const char * method, rtMessage request
     (void) destination;
     (void) method;
     rtMessage_Create(response);
+    printf("%s::%s %s, ptr\n", destination, method, (const char *)user_data);
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
-    rbus_SetString(*response, MESSAGE_FIELD_PAYLOAD, data);
+    rbus_SetString(*response, MESSAGE_FIELD_PAYLOAD, (const char *)user_data);
     return 0;
 }
 
@@ -140,15 +142,16 @@ int handle_set2(const char * destination, const char * method, rtMessage request
     (void) method;
     rtError err = RT_OK;
     const char * payload = NULL;
+    printf("calling set %s\n", (const char *)user_data);
+    printf("%s::%s %s, \n", destination, method, (const char *)user_data);
     if((err = rbus_GetString(request, MESSAGE_FIELD_PAYLOAD, &payload) == RT_OK))
     {
-        strncpy(data, payload, sizeof(data));
+        strncpy((char *)user_data, payload, sizeof(data));
     }
     rtMessage_Create(response);
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
     return 0;
 }
-
 int handle_getStudentInfo(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
 {
     (void) request;
@@ -364,5 +367,11 @@ int callback(const char * destination, const char * method, rtMessage message, v
 
     /* Craft response message.*/
     handle_unknown(destination, method, message, response);
+    return 0;
+}
+
+int sub1_callback(const char * object,  const char * event, const char * listener, int added, void* data)
+{
+    printf("Received sub_callback object=%s event=%s listerner=%s added=%d data=%p\n", object, event, listener, added, data);
     return 0;
 }
