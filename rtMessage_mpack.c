@@ -395,7 +395,7 @@ void rtMessage_BeginMetaSectionRead(rtMessage message)
     int section_offset = 0;
     message->meta_offset = message->read_offset; //For safekeeping.
     message->read_offset = message->sbuf.size - 5;
-    rtMessage_GetInt32(message, "offset", &section_offset);
+    (void) rtMessage_GetInt32(message, "offset", &section_offset);
     message->read_offset = section_offset;
 }
 
