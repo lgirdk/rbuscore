@@ -171,6 +171,7 @@ rtConnection_ConnectAndRegister(rtConnection con)
 {
   int i = 1;
   int ret = 0;
+  int fdManip = 0;
   socklen_t socket_length;
 
   rtSocketStorage_GetLength(&con->remote_endpoint, &socket_length);
@@ -184,7 +185,14 @@ rtConnection_ConnectAndRegister(rtConnection con)
     return rtErrorFromErrno(errno);
   rtLog_Info("router connection up");
 
-  fcntl(con->fd, F_SETFD, fcntl(con->fd, F_GETFD) | FD_CLOEXEC);
+  fdManip = fcntl(con->fd, F_GETFD);
+  if (fdManip < 0)
+    return rtErrorFromErrno(errno);
+
+  fdManip = fcntl(con->fd, F_SETFD, fdManip | FD_CLOEXEC);
+  if (fdManip < 0)
+    return rtErrorFromErrno(errno);
+
   setsockopt(con->fd, SOL_TCP, TCP_NODELAY, &i, sizeof(i));
 
   int retry = 0;

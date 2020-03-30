@@ -52,7 +52,7 @@ typedef struct
 
 static void rtErrorInitThreadSpecificKey()
 {
-  pthread_key_create(&key, free);
+  (void) pthread_key_create(&key, free);
 }
 
 rtErrorThreadSpecific* getThreadSpecific()
