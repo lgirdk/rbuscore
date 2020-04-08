@@ -249,7 +249,7 @@ rtError rtMessage_ToString(rtMessage const m, char** s, uint32_t* n)
         }
     }
     //Trim the last space.
-    if(' ' == buffer[write_offset - 1])
+    if(write_offset && (' ' == buffer[write_offset - 1]))
     {
         write_offset--;
         buffer[write_offset] = '\0';

@@ -129,7 +129,7 @@ static void CREATE_RBUS_SERVER_INSTANCE3(const char * app_prefix, int num)
     EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_registerObj failed";
     err = rbus_addElement(obj_name.c_str(), std::string(app_prefix + std::to_string(num) + std::string(".element")).c_str());
     EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_addElement failed";
-    err = rbus_addElement(obj_name.c_str(), std::string("common.element." + std::to_string(num)).c_str());
+    rbus_addElement(obj_name.c_str(), std::string("common.element." + std::to_string(num)).c_str());
     return;
 }
 
@@ -495,7 +495,8 @@ TEST_F(MultipleServerTest, rbus_multipleServer_test6)
     }
     if (is_parent)
     {
-        rbus_error_t err = rbus_openBrokerConnection("lookup_client");
+        rbus_error_t err;
+	rbus_openBrokerConnection("lookup_client");
         const char *inputs[] = {"lookup_test0.obj", "lookup_test0.element", "lookup_test1.obj", "lookup_test1.element1", "lookup_test0.", "lookup_test1.", "abcd", "common.", "common.element.0", "common.element.1"};
         constexpr int in_length = sizeof(inputs) / sizeof(char *);
         const char *expected_output[] = {"lookup_test0.obj", "lookup_test0.obj", "lookup_test1.obj", "lookup_test1.obj", "lookup_test0.obj", "lookup_test1.obj", "", "", "lookup_test0.obj", "lookup_test1.obj"};

@@ -34,7 +34,7 @@ static void fill_mystruct()
     mystruct.a = 3;
     mystruct.b = 4;
     mystruct.c = true;
-    strcpy(mystruct.name, "client string");
+    strncpy(mystruct.name, "client string", (sizeof(mystruct.name)-1));
     mystruct.d = 0xF0;
 }
 
