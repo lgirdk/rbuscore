@@ -316,6 +316,9 @@ static void perform_init()
 
 	pthread_mutexattr_t attr;
 	pthread_mutexattr_init(&attr);
+
+	/* Warning: using an error checking mutex but not checking for errors is a very bad approach... */
+
 	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
 	pthread_mutex_init(&g_mutex, &attr);
 
