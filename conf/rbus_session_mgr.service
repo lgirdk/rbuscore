@@ -25,7 +25,7 @@ Before=rbus.service
 [Service]
 Type=simple
 ExecStartPre=/bin/sh -c 'if [ -e /lib/rdk/rbus_rfc_handler.sh ]; then (/lib/rdk/rbus_rfc_handler.sh); fi'
-ExecStart=/bin/sh -c 'if [ -e /nvram/rbus ]; then /usr/bin/rbus_session_mgr; fi'
+ExecStart=/bin/sh -c 'if [ -e /nvram/rbus_support ]; then /usr/bin/rbus_session_mgr; fi'
 Restart=no
 
 [Install]

@@ -19,7 +19,7 @@
 [Unit]
 Description= An IPC framework
 After=rbus_session_mgr.service
-ConditionPathExists=/nvram/rbus
+ConditionPathExists=/nvram/rbus_support
 
 [Service]
 Type=forking
