@@ -67,6 +67,8 @@ if (BUILD_FOR_DESKTOP)
 	option(BUILD_RBUS_SAMPLE_APPS "BUILD_RBUS_SAMPLE_APPS" ON)
 	option(BUILD_RBUS_UNIT_TEST "BUILD_RBUS_UNIT_TEST" ON)
 	option(BUILD_RTMESSAGE_ONLY "BUILD_RTMESSAGE_ONLY" ON)
+else ()
+    option(ENABLE_RDKLOGGER "ENABLE_RDKLOGGER" ON)
 endif (BUILD_FOR_DESKTOP)
 
 #The below option builds only low level rtMessage APIs, plus the daemon and sample apps for those APIs.
@@ -107,6 +109,11 @@ if (BUILD_FOR_DESKTOP)
 		${CMAKE_CURRENT_SOURCE_DIR}/msgpack/build
 		${CMAKE_BINARY_DIR}
 		${LIBRARY_DIR})
+	if (ENABLE_RDKLOGGER)
+		include_directories(${CMAKE_INSTALL_PREFIX}/include)
+		link_directories(${CMAKE_INSTALL_PREFIX}/lib)
+		add_definitions(-DENABLE_RDKLOGGER)
+	endif (ENABLE_RDKLOGGER)
 else()
 	if (ENABLE_RDKLOGGER)
 		include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${INCLUDE_DIR} ${INCLUDE_DIR}/messagepack ${RDKLOGGER_PATH} ${RDKLOGGER_PATH}/include)
@@ -144,11 +151,10 @@ if (BUILD_RTMESSAGE_LIB)
 		local_benchmarking.c)
 	if (BUILD_FOR_DESKTOP)
 		add_dependencies(rtMessage msgpack)
-	else ()
-		if (ENABLE_RDKLOGGER)
-			target_link_libraries(rtMessage -llog4c -lrdkloggers)
-		endif (ENABLE_RDKLOGGER)
 	endif(BUILD_FOR_DESKTOP)
+    if (ENABLE_RDKLOGGER)
+		target_link_libraries(rtMessage -llog4c -lrdkloggers)
+	endif (ENABLE_RDKLOGGER)
 	target_link_libraries(rtMessage ${LIBRARY_LINKER_OPTIONS} -pthread -lmsgpackc)
 	set_target_properties(rtMessage
 		PROPERTIES SOVERSION "0"
@@ -260,5 +266,5 @@ if (BUILD_RTMESSAGE_ONLY)
 	install (TARGETS rtrouted rtMessage rtm_diag_probe
 		RUNTIME DESTINATION bin
 		LIBRARY DESTINATION lib)
-	install(FILES rtMessage.h rtMessageHeader.h rtError.h rtConnection.h rtVector.h rtm_discovery_api.h DESTINATION "include/rbus-core")
+	install(FILES rtMessage.h rtMessageHeader.h rtError.h rtConnection.h rtVector.h rtLog.h rtm_discovery_api.h DESTINATION "include/rbus-core")
 endif (BUILD_RTMESSAGE_ONLY)

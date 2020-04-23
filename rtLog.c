@@ -39,6 +39,15 @@
 #define strcasecmp _stricmp
 #endif
 
+#ifndef RT_LOGPREFIX
+#define RT_LOGPREFIX "rt:"
+#endif
+
+#ifdef ENABLE_RDKLOGGER
+#include "rdk_debug.h"
+#endif
+
+
 #include <inttypes.h>
 
 #ifdef __cplusplus
@@ -88,7 +97,16 @@ static const char* rtLogLevelStrings[] =
   "FATAL"
 };
 
+static rtLogHandler sLogHandler = NULL;
+static rtLogLevel sLevel = RT_LOG_FATAL;
+static rtLoggerSelection sOption = RT_USE_RTLOGGER;
 static const uint32_t numRTLogLevels = sizeof(rtLogLevelStrings)/sizeof(rtLogLevelStrings[0]);
+
+rtThreadId rtThreadGetCurrentId();
+
+#ifdef ENABLE_RDKLOGGER
+rdk_LogLevel rdkLogLevelFromrtLogLevel(rtLogLevel level);
+#endif
 
 const char* rtLogLevelToString(rtLogLevel l)
 {
@@ -155,75 +173,65 @@ static const char* rtTrimPath(const char* s)
   return t;
 }
 
-static rtLogHandler sLogHandler = NULL;
+
 void rtLogSetLogHandler(rtLogHandler logHandler)
 {
   sLogHandler = logHandler;
 }
 
-static rtLogLevel sLevel = RT_LOG_FATAL;
 void rtLog_SetLevel(rtLogLevel level)
 {
   sLevel = level;
 }
 
-static rtLogOption sOption = rtLog;
-void rtLog_SetOption(rtLogOption option)
+void rtLog_SetOption(rtLoggerSelection option)
 {
   sOption = option;
 }
 
+#define RT_LOG_BUFFER_SIZE    1024
 void rtLogPrintf(rtLogLevel level, const char* file, int line, const char* format, ...)
 {
-  if (level < sLevel)
-    return;
+  size_t n = 0;
+  char buff[RT_LOG_BUFFER_SIZE] = {0};
 
   const char* logLevel = rtLogLevelToString(level);
   const char* path = rtTrimPath(file);
-  
+
   rtThreadId threadId = rtThreadGetCurrentId();
 
-  #ifdef ENABLE_RDKLOGGER
-    rtLog_SetOption(rdkLog);
+  va_list args;
 
-    char buffer[2048] = {0};
-    va_list args;
+  va_start(args, format);
+  n = vsnprintf(buff, (RT_LOG_BUFFER_SIZE - 1), format, args);
+  va_end(args);
 
-    va_start(args, format);
-    size_t n = vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
+  if (n > (RT_LOG_BUFFER_SIZE - 1))
+  {
+    buff[RT_LOG_BUFFER_SIZE - 4] = '.';
+    buff[RT_LOG_BUFFER_SIZE - 3] = '.';
+    buff[RT_LOG_BUFFER_SIZE - 2] = '.';
+  }
+  buff[RT_LOG_BUFFER_SIZE - 1] = '\0';
 
-    if (n >= sizeof(buffer))
-      buffer[sizeof(buffer) - 1] = '\0';
-
+  if (NULL != sLogHandler)
+  {
+    sLogHandler(level, path, line, threadId, buff);
+  }
+#ifdef ENABLE_RDKLOGGER
+  else if (RT_USE_RDKLOGGER == sOption)
+  {
     rdk_LogLevel rdklevel = rdkLogLevelFromrtLogLevel(level);
-    if (n < sizeof(buffer))
-    {
-     RDK_LOG(rdklevel, "LOG.RDK.RTMESSAGE", "%s(%d) :%s\n", path, __LINE__, buffer);
-    }
-    else
-    {
-      RDK_LOG(rdklevel, "LOG.RDK.RTMESSAGE", "%s(%d) : %s...\n", path, __LINE__, buffer);
-    }
-  #else
-    rtLog_SetOption(rtLog);
-
-    size_t n = 0;
-    char buff[1024];
-    va_list args;
-
-    va_start(args, format);
-    n = vsnprintf(buff, sizeof(buff), format, args);
-    va_end(args);
-
-    if (n >= sizeof(buff))
-      buff[sizeof(buff) - 1] = '\0';
+    RDK_LOG(rdklevel, "LOG.RDK.RBUS.RTMESSAGE", "%s(%d) :%s\n", path, line, buff);
+  }
+#endif
+  else
+  {
+    if (level < sLevel)
+      return;
 
     printf(RT_LOGPREFIX "%5s %s:%d -- Thread-%" RT_THREADID_FMT ": %s \n", logLevel, path, line, threadId, buff);
-  #endif
-
-  if (level == RT_LOG_FATAL)
-    abort();
+  }
 }
 
 rtThreadId rtThreadGetCurrentId()

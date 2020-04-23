@@ -1,0 +1,12 @@
+[Unit]
+Description= Capture rbus rtRouted process logs. Only for RDK-B devices
+After=rbus.service
+ConditionPathExists=/usr/bin/rbus_log_capture.sh
+
+[Service]
+Type=simple
+ExecStart=/bin/sh '/usr/bin/rbus_log_capture.sh'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
