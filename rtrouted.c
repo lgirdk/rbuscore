@@ -149,7 +149,7 @@ rtRouted_AddRoute(rtRouteMessageHandler handler, char const* exp, rtSubscription
   route->message_handler = handler;
   strncpy(route->expression, exp, RTMSG_MAX_EXPRESSION_LEN);
   rtVector_PushBack(routes, route);
-  rtLog_Info("client [%s] added new route:%s", subscription->client->ident, exp);
+  rtLog_Debug("client [%s] added new route:%s", subscription->client->ident, exp);
   rtree_set_value(exp, (void *)route);
   return RT_OK;
 }
@@ -157,7 +157,7 @@ rtRouted_AddRoute(rtRouteMessageHandler handler, char const* exp, rtSubscription
 static rtError
 rtRouted_AddAlias(char const* exp, rtRouteEntry * route)
 {
-  rtLog_Info("Added new alias %s to route %s", exp, route->expression);
+  rtLog_Debug("Added new alias %s to route %s", exp, route->expression);
   rtree_set_value(exp, (void *)route);
   return RT_OK;
 }
@@ -167,7 +167,7 @@ rtRouted_ClearRoute(rtRouteEntry * route)
 {
   rtVector_RemoveItem(routes, route, NULL);
   free(route->subscription);
-  rtLog_Info("Clearing route %s", route->expression);
+  rtLog_Debug("Clearing route %s", route->expression);
   rtree_remove_nodes_matching_value((void *)route);
   free(route);
   return RT_OK;
@@ -433,7 +433,7 @@ rtRouted_OnMessage(rtConnectedClient* sender, rtMessageHeader* hdr, uint8_t cons
         if(0 == route_removed)
         {
           //Not a route. Is it an alias?
-          rtLog_Info("Removing alias %s", expression);
+          rtLog_Debug("Removing alias %s", expression);
           rtree_remove_value(expression);
             rtree_get_stats();
         }

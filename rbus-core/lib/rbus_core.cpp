@@ -801,7 +801,7 @@ rbus_error_t rbus_addElement(const char * object_name, const char * element)
         return RTMESSAGE_BUS_ERROR_GENERAL;
     }
 
-    rtLog_Info("Added alias %s for object %s.", element, object_name);
+    rtLog_Debug("Added alias %s for object %s.", element, object_name);
     return RTMESSAGE_BUS_SUCCESS;
 }
 
@@ -1230,7 +1230,7 @@ rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event
 
     if(false == g_run_event_client_dispatch)
     {
-        rtLog_Info("Starting event dispatching.");
+        rtLog_Debug("Starting event dispatching.");
         rtConnection_AddDefaultListener(g_connection, &master_event_callback, NULL);
         g_run_event_client_dispatch = true;
     }
