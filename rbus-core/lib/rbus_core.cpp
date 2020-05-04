@@ -1046,7 +1046,7 @@ rbus_error_t rbus_registerEvent(const char* object_name, const char * event, rbu
 
     if(NULL == event)
         event = DEFAULT_EVENT;
-    if((NULL == object_name) || (NULL == callback))
+    if(NULL == object_name)
     {
         rtLog_Error("Invalid parameter(s)");
         return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
