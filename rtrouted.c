@@ -744,6 +744,25 @@ rtConnectedClient_Reset(rtConnectedClient *clnt)
   rtMessageHeader_Init(&clnt->header);
 }
 
+static char*
+rtRouted_GetClientName(rtConnectedClient* clnt)
+{
+  size_t i;
+  i = rtVector_Size(routes);
+  char *clnt_name = NULL;
+  while(i--)
+  {
+    rtRouteEntry* route = (rtRouteEntry *) rtVector_At(routes, i);
+    if(route && (route->subscription) && (route->subscription->client)) {
+      if(strcmp( route->subscription->client->ident, clnt->ident ) == 0) {
+        clnt_name = route->expression;
+        break;
+      }
+    }
+  }
+  return clnt_name;
+}
+
 static rtError
 rtConnectedClient_Read(rtConnectedClient* clnt)
 {
@@ -779,7 +798,7 @@ rtConnectedClient_Read(rtConnectedClient* clnt)
         rtEncoder_DecodeUInt16(&itr, &header_version);
         if((RTMSG_HEADER_MARKER != header_start) || (RTMSG_HEADER_VERSION != header_version))
         {
-          rtLog_Warn("Bad header in message from %s", clnt->ident);
+          rtLog_Warn("Bad header in message from %s - %s", clnt->ident, rtRouted_GetClientName(clnt));
           rtConnectedClient_Reset(clnt);
           break;
         }
@@ -796,7 +815,7 @@ rtConnectedClient_Read(rtConnectedClient* clnt)
       {
         if(RT_OK != rtMessageHeader_Decode(&clnt->header, clnt->read_buffer))
         {
-          rtLog_Warn("Bad header in message from %s", clnt->ident);
+          rtLog_Warn("Bad header in message from %s - %s", clnt->ident, rtRouted_GetClientName(clnt));
           rtConnectedClient_Reset(clnt);
           break;
         }
