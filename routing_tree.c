@@ -437,7 +437,7 @@ int rtree_set_value(const char * key, void * value)
     void * duplicate_value;
     if(0 == rtree_get_value(key, &duplicate_value))
     {
-        rtLog_Error("Rejecting new route because a duplicate one already exists.");
+        rtLog_Debug("Rejecting new route because a duplicate one already exists.");
         return -1;
     }
     rtLog_Debug("Setting value for key %s", key);
