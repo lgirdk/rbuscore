@@ -698,6 +698,10 @@ int rtree_get_value_o2(const char * key, void **value)
     {
         g_quick_lookup_list.num_entries = 0;
         rtree_generate_quick_match_expressions(&g_quick_lookup_list);
+        if(!g_quick_lookup_list.entries) {
+            rtLog_Warn("RTROUTED_NULL_ENTRIES: rtree_get_value_o2() - entries is NULL");
+            return ret;
+        }
         sort_bundle(&g_quick_lookup_list);
         g_quick_lookup_is_uptodate = 1;
     }
