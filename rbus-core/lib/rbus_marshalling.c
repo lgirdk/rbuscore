@@ -46,7 +46,7 @@ rtError rbus_AddString(rtMessage message, char const* name, char const* value)
 
 rtError rbus_AppendString(rtMessage message, char const* value)
 {
-    return rtMessage_AddString(message, nullptr, (nullptr != value ? value : ""));
+    return rtMessage_AddString(message, NULL, (NULL != value ? value : ""));
 }
 /**
  * Add binary data to message
@@ -63,7 +63,7 @@ rtError rbus_AddBinaryData(rtMessage message, char const* name, void const * ptr
 
 rtError rbus_AppendBinaryData(rtMessage message, void const * ptr, const uint32_t size)
 {
-    return rtMessage_AddBinaryData(message, nullptr, ptr, size);
+    return rtMessage_AddBinaryData(message, NULL, ptr, size);
 }
 /**
  * Add message field to array in message
@@ -127,7 +127,7 @@ rtError rbus_SetInt32(rtMessage message, char const* name, int32_t value)
 }
 rtError rbus_AppendInt32(rtMessage message,int32_t value)
 {
-    return rtMessage_SetInt32(message, nullptr, value);
+    return rtMessage_SetInt32(message, NULL, value);
 }
 /**
  * Add double field to the message
@@ -143,7 +143,7 @@ rtError rbus_SetDouble(rtMessage message, char const* name, double value)
 
 rtError rbus_AppendDouble(rtMessage message,double value)
 {
-    return rtMessage_SetDouble(message, nullptr, value);
+    return rtMessage_SetDouble(message, NULL, value);
 }
 /**
  * Add sub message field to the message
@@ -170,7 +170,7 @@ rtError rbus_GetString(rtMessage const m, char const* name, char const** value)
 }
 rtError rbus_PopString(rtMessage const m,char const** value)
 {
-    return rtMessage_GetString(m, nullptr, value);
+    return rtMessage_GetString(m, NULL, value);
 }
 /**
  * Get binary data from message
@@ -186,7 +186,7 @@ rtError rbus_GetBinaryData(rtMessage message, char const* name, const void ** pt
 }
 rtError rbus_PopBinaryData(rtMessage message, const void ** ptr, uint32_t *size)
 {
-    return rtMessage_GetBinaryData(message, nullptr, ptr, size);
+    return rtMessage_GetBinaryData(message, NULL, ptr, size);
 }
 
 /**
@@ -215,7 +215,7 @@ rtError rbus_GetInt32(rtMessage const m, char const* name, int32_t* value)
 }
 rtError rbus_PopInt32(rtMessage const m, int32_t* value)
 {
-    return rtMessage_GetInt32(m, nullptr, value);
+    return rtMessage_GetInt32(m, NULL, value);
 }
 
 /**
@@ -231,7 +231,7 @@ rtError rbus_GetDouble(rtMessage const m, char const* name, double* value)
 }
 rtError rbus_PopDouble(rtMessage const m, double* value)
 {
-    return rtMessage_GetDouble(m, nullptr, value);
+    return rtMessage_GetDouble(m, NULL, value);
 }
 
 /**

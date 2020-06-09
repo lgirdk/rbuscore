@@ -26,6 +26,10 @@ Test server for unit test client testing
 #define METHOD_SET_BINARY_RPC "METHOD_SET_BINARY_RPC"
 #define METHOD_SET_TIMEOUT_RPC "METHOD_SET_TIMEOUT_RPC"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct
 {
    char name[100];
@@ -46,22 +50,26 @@ typedef struct
 }test_array_data_t;
 
 void reset_stored_data();
-int handle_get1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_set1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_get2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_recursive_get(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_set2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_getStudentInfo(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_setStudentInfo(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_getBinaryData(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_setBinaryDataSize(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_getLargeBinaryData(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_setBinaryData(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_getAttributes1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_setAttributes1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_getAttributes2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_setAttributes2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-int handle_timeout(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response);
-void handle_unknown(const char * destination, const char * method, rtMessage request, rtMessage *response);
-int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response);
+int handle_get1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_set1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_get2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_recursive_get(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_set2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_getStudentInfo(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_setStudentInfo(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_getBinaryData(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_setBinaryDataSize(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_getLargeBinaryData(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_setBinaryData(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_getAttributes1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_setAttributes1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_getAttributes2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_setAttributes2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+int handle_timeout(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
+void handle_unknown(const char * destination, const char * method, rtMessage request, rtMessage *response, const rtMessageHeader* hdr);
+int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
 int sub1_callback(const char * object,  const char * event, const char * listener, int added, void* data);
+
+#ifdef __cplusplus
+}
+#endif
