@@ -24,7 +24,7 @@ if (BUILD_RBUS_BENCHMARK_TEST)
 find_package(benchmark REQUIRED)
 
 add_executable(rbus_benchmark_test_app
-               rbus_test_util.cpp
+               rbus_test_util.c
                rbus_benchmark_test_app.cpp)
 add_definitions("-DHAVE_POSIX_REGEX")
 target_link_libraries(rbus_benchmark_test_app rbus-core benchmark ${CMAKE_THREAD_LIBS_INIT})

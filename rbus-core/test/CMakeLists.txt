@@ -41,11 +41,11 @@ add_executable(bin_server bin_server.c)
 add_dependencies(bin_server rbus-core)
 target_link_libraries(bin_server rbus-core)
 
-add_executable(rbus_perf rbus_perf.cpp)
-add_dependencies(rbus_perf rbus-core)
-target_link_libraries(rbus_perf rbus-core)
+#add_executable(rbus_perf rbus_perf.c)
+#add_dependencies(rbus_perf rbus-core)
+#target_link_libraries(rbus_perf rbus-core)
 
-install (TARGETS bin_server bin_client rbus_perf 
+install (TARGETS bin_server bin_client #rbus_perf 
         RUNTIME DESTINATION bin)
 
 if (BUILD_RBUS_UNIT_TEST)
@@ -84,15 +84,15 @@ add_executable(rbus_nested_test_server nested_server.c)
 add_dependencies(rbus_nested_test_server rbus-core)
 target_link_libraries(rbus_nested_test_server rbus-core)
 
-add_executable(rbus_load_test loadtest.cpp)
-add_dependencies(rbus_load_test rbus-core)
-target_link_libraries(rbus_load_test rbus-core)
+#add_executable(rbus_load_test loadtest.c)
+#add_dependencies(rbus_load_test rbus-core)
+#target_link_libraries(rbus_load_test rbus-core)
 
-add_executable(rbus_obj_lookup test_obj_lookup.cpp)
+add_executable(rbus_obj_lookup test_obj_lookup.c)
 add_dependencies(rbus_obj_lookup rbus-core)
 target_link_libraries(rbus_obj_lookup rbus-core)
 
-install (TARGETS rbus_sample_event_server rbus_sample_event_client rbus_sample_wildcard_server rbus_sample_wildcard_client rbus_load_test 
+install (TARGETS rbus_sample_event_server rbus_sample_event_client rbus_sample_wildcard_server rbus_sample_wildcard_client #rbus_load_test 
         RUNTIME DESTINATION bin)
 
 

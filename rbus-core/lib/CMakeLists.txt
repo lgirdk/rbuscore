@@ -27,8 +27,8 @@ include_directories(
 add_library(
     rbus-core	
     SHARED
-    rbus_core.cpp
-    rbus_marshalling.cpp)
+    rbus_core.c
+    rbus_marshalling.c)
 add_dependencies(
     rbus-core	
     rtMessage)

@@ -81,20 +81,6 @@ void rtree_get_stats()
     rtLog_Info("<< rtree statistics: %d root nodes, %d dynamic nodes. >>", g_num_root_nodes, g_num_dynamic_nodes);
 }
 
-static void rtree_set_value_comparator(value_comparison_fn_t fn)
-{
-    if(NULL == fn)
-    {
-        g_comparison_fn = dummy_equivalence_fn;
-        rtLog_Info("Clearing value comparator. Reset to default comparator.");
-    }
-    else
-    {
-        g_comparison_fn = fn;
-        rtLog_Info("New comparison function installed");
-    }
-}
-
 static int add_root_node(char * key, void * optional_value, node_t ** created_node)
 {
     int ret = 0;
@@ -920,7 +906,6 @@ static int rtree_get_dynamic_nodes_matching_value(node_t *node, rtree_key_bundle
 int rtree_get_all_nodes_matching_value(rtree_key_bundle_t * bundle, void * value)
 {
     int ret = 0;
-    int node_removed = 0;
     for(unsigned int i = 0; i < ROOT_LIST_LENGTH; i++)
     {
         if(NULL != root_list[i].name)

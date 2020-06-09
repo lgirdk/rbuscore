@@ -642,6 +642,7 @@ rtRouted_OnMessage(rtConnectedClient* sender, rtMessageHeader* hdr, uint8_t cons
   return RT_OK;
 }
 
+#if 0
 static int
 rtRouted_IsTopicMatch(char const* topic, char const* exp)
 {
@@ -678,6 +679,7 @@ rtRouted_IsTopicMatch(char const* topic, char const* exp)
   // rtLogInfo("match[%d]: %s <> %s", !(*t || *e), topic, exp);
   return !(*t || *e);
 }
+#endif
 
 static void
 rtConnectedClient_Init(rtConnectedClient* clnt, int fd, struct sockaddr_storage* remote_endpoint)

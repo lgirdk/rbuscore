@@ -228,7 +228,7 @@ rtError rtMessage_ToString(rtMessage const m, char** s, uint32_t* n)
     {
         if((1 >= (size - write_offset)) || 
                 //Special handling for text as snprintf will write past a buffer boundary if precision calls for it.
-                ((MSGPACK_OBJECT_STR == m->upk.data.type) && (m->upk.data.via.str.size > (size - write_offset - 3/*account for quotes + terminator in the output*/))))
+                ((MSGPACK_OBJECT_STR == m->upk.data.type) && ((int)m->upk.data.via.str.size > (size - write_offset - 3/*account for quotes + terminator in the output*/))))
         {
             //Truncated output. Indicate so.
             //First, make room for ellipsis

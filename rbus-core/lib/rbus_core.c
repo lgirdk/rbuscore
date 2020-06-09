@@ -1,4 +1,4 @@
-/*
+                                                                        /*
   * If not stated otherwise in this file or this component's Licenses.txt file
   * the following copyright and licenses apply:
   *
@@ -19,225 +19,280 @@
 #define _GNU_SOURCE 1
 #include <stdlib.h>
 #include <string.h>
-#include <string>
-#include <vector>
 #include <pthread.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include <algorithm>
-#include <fstream>
-#include <string>
-#include <list>
-//#include <type_traits>
+#include <ctype.h>
 
 #include "rbus_core.h"
 #include "rbus_marshalling.h"
 #include "rtLog.h"
+#include "rtVector.h"
 
 /* Begin constant definitions.*/
 static const unsigned int TIMEOUT_VALUE_FIRE_AND_FORGET = 1000;
 static const unsigned int MAX_SUBSCRIBER_NAME_LENGTH = MAX_OBJECT_NAME_LENGTH;
 static const char * DEFAULT_EVENT = "";
-static std::string g_daemon_address;
 #define METHOD_ADD_EVENT_SUBSCRIPTION "_subscribe"
 #define METHOD_REMOVE_EVENT_SUBSCRIPTION "_unsubscribe"
 /* End constant definitions.*/
 
 /* Begin type definitions.*/
-namespace rbus_server
+
+/* Begin rbus_server */
+
+struct _server_object;
+typedef struct _server_object* server_object_t;
+
+typedef struct _server_method
 {
-    struct method_table_entry_t
+    char name[MAX_METHOD_NAME_LENGTH+1];
+    rbus_callback_t callback;
+    void * data;
+} *server_method_t;
+
+
+typedef struct _server_event
+{
+    char name[MAX_EVENT_NAME_LENGTH+1];
+    server_object_t object;
+    rtVector listeners /*list of strings*/;
+    rbus_event_subscribe_callback_t sub_callback;
+    void * sub_data;
+} *server_event_t;
+
+typedef struct _server_object
+{
+    char name[MAX_OBJECT_NAME_LENGTH+1];
+    void* data;
+    rbus_callback_t callback;
+    bool process_event_subscriptions;
+    rtVector methods; /*list of server_method_t*/
+    rtVector subscriptions; /*list of server_event_t*/
+    rbus_event_subscribe_callback_t subscribe_handler_override;
+    void* subscribe_handler_data;
+} *server_object_t;
+
+void server_method_create(server_method_t* meth, char const* name, rbus_callback_t callback, void* data)
+{
+    (*meth) = malloc(sizeof(struct _server_method));
+    strcpy((*meth)->name, name);
+    (*meth)->callback = callback;
+    (*meth)->data = data;
+}
+
+int server_method_compare(const void* left, const void* right)
+{
+    return strncmp(((server_event_t)left)->name, (char*)right, MAX_METHOD_NAME_LENGTH);
+}
+
+int server_event_compare(const void* left, const void* right)
+{
+    return strncmp(((server_event_t)left)->name, (char*)right, MAX_EVENT_NAME_LENGTH);
+}
+
+void server_event_create(server_event_t* event, const char * event_name, server_object_t obj, rbus_event_subscribe_callback_t sub_callback, void* sub_data)
+{
+    (*event) = malloc(sizeof(struct _server_event));
+    rtVector_Create(&(*event)->listeners);
+    strcpy((*event)->name, event_name);
+    (*event)->object = obj;
+    (*event)->sub_callback = sub_callback;
+    (*event)->sub_data = sub_data;
+}
+
+void server_event_destroy(void* p)
+{
+    server_event_t event = p;
+    rtVector_Destroy(event->listeners, rtVector_Cleanup_Free);
+    free(event);
+}
+
+void server_event_addListener(server_event_t event, char const* listener)
+{
+    if(!listener)
     {
-        std::string method;
-        rbus_callback_t callback;
-        void * data;
-    };
-
-    struct rbus_object;
-
-    struct event_entry_t 
+        rtLog_Error("Listener is empty.");
+    }
+    else if(!rtVector_HasItem(event->listeners, listener, rtVector_Compare_String))
     {
-        std::string event_name;
-        rbus_object* object;
-        std::vector <std::string> listeners;
-        rbus_event_subscribe_callback_t sub_callback;
-        void * sub_data;
+        rtVector_PushBack(event->listeners, strdup(listener));
 
-        event_entry_t(const char * event, rbus_object* obj, rbus_event_subscribe_callback_t cb, void * data);
-        void addListener(const char * listener);
-        void removeListener(const char * listener);
-    };
-
-    struct rbus_object
-    {
-        char name[MAX_OBJECT_NAME_LENGTH];
-        void * data;
-        rbus_callback_t callback;
-        int num_registered_methods;
-        bool process_event_subscriptions;
-        method_table_entry_t method_callbacks[MAX_SUPPORTED_METHODS];
-        std::vector <event_entry_t> subscription_table;
-        rbus_event_subscribe_callback_t subscribe_handler_override;
-        void* subscribe_handler_data;
-
-        rbus_error_t addSubscriber(const char * event, const char * subscriber)
+        if(event->sub_callback)
         {
-            if((NULL == event) || (NULL == subscriber) ||
-                    (MAX_SUBSCRIBER_NAME_LENGTH <= strlen(subscriber)) || (MAX_EVENT_NAME_LENGTH <= strlen(event)))
-            {
-                rtLog_Error("Cannot add subscriber %s to event %s. Length exceeds limits.", subscriber, event);//TODO: bad idea tp try to print a bad input. Clean up.
-                return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
-            }
-            
-            if(subscribe_handler_override)
-            {
-                return (rbus_error_t)subscribe_handler_override(name, event, subscriber, 1, subscribe_handler_data);
-            }
-
-            const auto iter = std::find_if(subscription_table.begin(), subscription_table.end(), 
-                    [&event](const event_entry_t &entry) -> bool { return (entry.event_name == event); });
-
-            if(subscription_table.end() != iter)
-            {
-                iter->addListener(subscriber);
-                return RTMESSAGE_BUS_SUCCESS;
-            }
-            else
-            {
-                rtLog_Error("Object %s doesn't support event %s. Cannot register listener.", name, event);
-                return RTMESSAGE_BUS_ERROR_UNSUPPORTED_EVENT;
-            }
+            event->sub_callback(event->object->name, event->name, listener, 1, event->sub_data);
         }
 
-        rbus_error_t removeSubscriber(const char * event, const char * subscriber)
+        rtLog_Info("Listener %s added for event %s.", listener, event->name);
+    }
+    else
+    {
+        rtLog_Warn("Listener %s is already registered for event %s.", listener, event->name);
+    }
+}
+
+void server_event_removeListener(server_event_t event, char const* listener)
+{
+    if(!listener)
+    {
+        rtLog_Error("Listener is empty.");
+    }
+    else if(rtVector_HasItem(event->listeners, listener, rtVector_Compare_String))
+    {
+        rtLog_Warn("Removing listener %s for event %s.", listener, event->name);
+
+        rtVector_RemoveItemByCompare(event->listeners, listener, rtVector_Compare_String, rtVector_Cleanup_Free);
+
+        if(event->sub_callback)
         {
-            if((NULL == event) || (NULL == subscriber) ||
-                    (MAX_SUBSCRIBER_NAME_LENGTH <= strlen(subscriber)) || (MAX_EVENT_NAME_LENGTH <= strlen(event)))
-            {
-                rtLog_Error("Cannot remove subscriber %s to event %s. Length exceeds limits.", subscriber, event); //TODO: bad idea tp try to print a bad input. Clean up.
-                return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
-            }
-
-            if(subscribe_handler_override)
-            {
-                return (rbus_error_t)subscribe_handler_override(name, event, subscriber, 0, subscribe_handler_data);
-            }
-
-            const auto iter = std::find_if(subscription_table.begin(), subscription_table.end(), 
-                    [&event](const event_entry_t &entry) -> bool { return (entry.event_name == event); });
-
-            if(subscription_table.end() != iter)
-            {
-                iter->removeListener(subscriber);
-                return RTMESSAGE_BUS_SUCCESS;
-            }
-            else
-            {
-                rtLog_Error("Object %s doesn't support event %s.", name, event);
-                return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
-            }
+            event->sub_callback(event->object->name, event->name, listener, 0, event->sub_data);
         }
-    };
+    }
+    else
+    {
+        rtLog_Error("Listener %s not found for event %s.", listener, event->name);
+    }
+}
+
+int server_object_compare(const void* left, const void* right)
+{
+    return strncmp(((server_object_t)left)->name, (char*)right, MAX_OBJECT_NAME_LENGTH);
+}
+
+void server_object_create(server_object_t* obj, char const* name, rbus_callback_t callback, void* data)
+{
+    (*obj) = malloc(sizeof(struct _server_object));
+    strcpy((*obj)->name, name);
+    (*obj)->callback = callback;
+    (*obj)->data = data;
+    (*obj)->process_event_subscriptions = false;
+    (*obj)->subscribe_handler_override = NULL;
+    (*obj)->subscribe_handler_data = NULL;
+    rtVector_Create(&(*obj)->methods);
+    rtVector_Create(&(*obj)->subscriptions);
+}
+
+void server_object_destroy(void* p)
+{
+    server_object_t obj = p;
+    rtVector_Destroy(obj->methods, rtVector_Cleanup_Free);
+    rtVector_Destroy(obj->subscriptions, server_event_destroy);
+    free(obj);
+}
+
+rbus_error_t server_object_subscription_handler(server_object_t obj, const char * event, char const* subscriber, int added)
+{
+    if((NULL == event) || (NULL == subscriber) ||
+       (MAX_SUBSCRIBER_NAME_LENGTH <= strlen(subscriber)) || 
+       (MAX_EVENT_NAME_LENGTH <= strlen(event)))
+    {
+        rtLog_Error("Cannot %s subscriber %s to event %s. Length exceeds limits.", added ? "add":"remove", subscriber, event);
+        return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+    }
     
-    event_entry_t::event_entry_t(const char * event, rbus_object* obj, rbus_event_subscribe_callback_t cb, void * data) : 
-        event_name(event), object(obj), sub_callback(cb), sub_data(data) {}
-
-    void event_entry_t::addListener(const char * listener)
+    if(obj->subscribe_handler_override)
     {
-        if(NULL == listener)
-        {
-            rtLog_Error("Listener is empty.");
-            return;
-        }
-        /*Avoid doing this if a duplicate entry exists.*/
-        const auto iter = std::find_if(listeners.begin(), listeners.end(), 
-                [&listener](const std::string &existing) -> bool { return (existing == listener); });
-
-        if(listeners.end() != iter)
-        {
-            rtLog_Warn("Listener %s is already registered for event %s.", listener, event_name.c_str());
-            return;
-        }
-        listeners.emplace_back(listener);
-
-        if(sub_callback)
-        {
-            sub_callback(object->name, event_name.c_str(), listener, 1, sub_data);
-        }
-
-        rtLog_Info("Listener %s added for event %s.", listener, event_name.c_str());
+        return (rbus_error_t)obj->subscribe_handler_override(obj->name, event, subscriber, added, obj->subscribe_handler_data);
     }
 
-    void event_entry_t::removeListener(const char * listener)
+    server_event_t server_event = rtVector_Find(obj->subscriptions, event, server_event_compare);
+
+    if(server_event)
     {
-        if(NULL == listener)
+        if(added)
         {
-            rtLog_Error("Listener is empty.");
-            return;
-        }
-        const auto iter = std::find_if(listeners.begin(), listeners.end(), 
-                [&listener](const std::string &existing) -> bool { return (existing == listener); });
-
-        if(listeners.end() != iter)
-        {
-            rtLog_Warn("Removing listener %s for event %s.", listener, event_name.c_str());
-            listeners.erase(iter);
-
-            if(sub_callback)
-            {
-                sub_callback(object->name, event_name.c_str(), listener, 0, sub_data);
-            }
+            rtVector_PushBack(server_event->listeners, strdup(subscriber));
         }
         else
         {
-            rtLog_Error("Listener %s not found for event %s.", listener, event_name.c_str());
+            rtVector_RemoveItemByCompare(server_event->listeners, subscriber, rtVector_Compare_String, rtVector_Cleanup_Free);
         }
-        return;
+        return RTMESSAGE_BUS_SUCCESS;
     }
-
-    struct queued_request
+    else
     {
-        rtMessageHeader hdr;
-        rtMessage msg;
-        rbus_server::rbus_object * obj;
-    };
+        rtLog_Error("Object %s doesn't support event %s. Cannot %s listener.", obj->name, event, added ? "add":"remove");
+        return RTMESSAGE_BUS_ERROR_UNSUPPORTED_EVENT;
+    }
 }
 
-namespace rbus_client
+typedef struct _queued_request
 {
-    struct subscription_t
-    {
-        struct event_entry_t
-        {
-            std::string event_name;
-            rbus_event_callback_t callback;
-            void * user_data;
-            event_entry_t(const char * event, rbus_event_callback_t cb, void * data) : event_name(event), callback(cb), user_data(data) {}
-        };
+    rtMessageHeader hdr;
+    rtMessage msg;
+    server_object_t obj;
+} *queued_request_t;
 
-        std::string object;
-        std::vector <event_entry_t> event_list;
-
-        subscription_t(const char * object_name, const char * event_name, rbus_event_callback_t cb, void * user_data) : object(object_name)
-        {
-            rtLog_Info("%s: Adding subscription for %s::%s.", __FUNCTION__, object_name, event_name);
-            event_list.emplace_back(event_name, cb, user_data);
-        }
-    };
+void queued_request_create(queued_request_t* req, rtMessageHeader hdr, rtMessage msg, server_object_t obj)
+{
+    (*req) = malloc(sizeof(struct _queued_request));
+    (*req)->hdr = hdr;
+    (*req)->msg = msg;
+    (*req)->obj = obj;
 }
 
+/* End rbus_server */
+
+/* Begin rbus_client */
+typedef struct _client_event
+{
+    char name[MAX_EVENT_NAME_LENGTH+1];
+    rbus_event_callback_t callback;
+    void* data;
+} *client_event_t;
+
+typedef struct _client_subscription
+{
+    char object[MAX_OBJECT_NAME_LENGTH+1];
+    rtVector events; /*list of client_event_t*/
+} *client_subscription_t;
+
+void client_event_create(client_event_t* event, const char* name, rbus_event_callback_t callback, void* data)
+{
+    (*event) = malloc(sizeof(struct _client_event));
+    (*event)->callback = callback;
+    (*event)->data = data;
+    strcpy((*event)->name, name);
+}
+
+int client_event_compare(const void* left, const void* right)
+{
+    return strncmp(((const client_event_t)left)->name, (char const*)right, MAX_EVENT_NAME_LENGTH);
+}
+
+int client_subscription_compare(const void* left, const void* right)
+{
+    return strncmp(((const client_subscription_t)left)->object, (char const*)right, MAX_OBJECT_NAME_LENGTH);
+}
+
+void client_subscription_create(client_subscription_t* sub, const char * object_name)
+{
+    (*sub) = malloc(sizeof(struct _client_subscription));
+    strcpy((*sub)->object, object_name);
+    rtVector_Create(&(*sub)->events); 
+}
+
+void client_subscription_destroy(void* p)
+{
+    client_subscription_t sub = p;
+    rtVector_Destroy(sub->events, rtVector_Cleanup_Free);
+    free(sub);
+}
+
+/* End rbus_client */
 
 /* End type definitions.*/
 
 /* Begin global variables*/
-static const char * default_daemon_address = "unix:///tmp/rtrouted"; 
+#define MAX_DAEMON_ADDRESS_LEN 256
+static char g_daemon_address[MAX_DAEMON_ADDRESS_LEN] = "unix:///tmp/rtrouted";
 static rtConnection g_connection = NULL;
-static rbus_server::rbus_object g_object_table[MAX_REGISTERED_OBJECTS];
-static pthread_mutex_t g_mutex = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
+static rtVector g_server_objects; /*server_object_t list*/
+static pthread_mutex_t g_mutex;
 static bool g_run_event_client_dispatch = false;
-static std::vector <rbus_client::subscription_t> g_event_subscriptions_for_client; //Used by the subscriber to track all active subscriptions.
+static rtVector g_event_subscriptions_for_client; /*client_subscription_t list. Used by the subscriber to track all active subscriptions. */
+rtVector g_queued_requests; /*list of queued_request */
 /* End global variables*/
-
 
 static int lock()
 {
@@ -249,6 +304,57 @@ static int unlock()
 	return pthread_mutex_unlock(&g_mutex);
 }
 
+static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate);
+
+static void perform_init()
+{
+	rtLog_Info("Performing init");
+
+	pthread_mutexattr_t attr;
+	pthread_mutexattr_init(&attr);
+	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+	pthread_mutex_init(&g_mutex, &attr);
+
+    rtVector_Create(&g_server_objects);
+    rtVector_Create(&g_event_subscriptions_for_client);
+}
+
+static void perform_cleanup()
+{
+    size_t i, sz;
+
+    rtLog_Info("Performing cleanup");
+
+    lock();
+
+    rtVector_Destroy(g_server_objects, server_object_destroy);
+
+    sz = rtVector_Size(g_event_subscriptions_for_client);
+    if(sz>0)
+    {
+        rtLog_Info("Cancelling active event subscriptions.");
+        unlock();
+        for(i = 0; i < sz; ++i)
+        {
+            size_t i2, sz2;
+            client_subscription_t sub = rtVector_At(g_event_subscriptions_for_client, i);
+
+            sz2 = rtVector_Size(sub->events);
+            for(i2 = 0; i2 < sz2; i2++)
+            {   
+                client_event_t event = rtVector_At(sub->events, i2);
+                send_subscription_request(sub->object, event->name, false);
+            }
+        }
+        lock();
+    }
+    rtVector_Destroy(g_event_subscriptions_for_client, client_subscription_destroy);
+
+    unlock();
+
+    pthread_mutex_destroy(&g_mutex);
+}
+
 rbus_error_t set_message_method(rtMessage msg, const char *method)
 {
     rtMessage_BeginMetaSectionWrite(msg);
@@ -256,21 +362,17 @@ rbus_error_t set_message_method(rtMessage msg, const char *method)
     rtMessage_EndMetaSectionWrite(msg);
 	return RTMESSAGE_BUS_SUCCESS;
 }
-
+#if 0 /*mrollins cannot use this after converting g_server_objects to a dynamic rtVector*/
 static int dummyOnMessage(const char *, const char *, rtMessage, void *, rtMessage *)
 {
 	/*do nothing.*/
 	return 0;
 }
+#endif
 
-static rbus_server::rbus_object * get_object(const char * object_name)
+static server_object_t get_object(const char * object_name)
 {
-    for(int i = 0; i < MAX_REGISTERED_OBJECTS; i++)
-    {
-        if(0 == strncmp(g_object_table[i].name, object_name, MAX_OBJECT_NAME_LENGTH))
-            return &g_object_table[i];
-    }
-    return NULL;
+    return rtVector_Find(g_server_objects, object_name, server_object_compare);
 }
 
 static rbus_error_t translate_rt_error(rtError err)
@@ -281,41 +383,33 @@ static rbus_error_t translate_rt_error(rtError err)
         return RTMESSAGE_BUS_ERROR_GENERAL;
 }
 
-static std::list<rbus_server::queued_request *> request_queue;
-
-static void dispatch_method_call(rtMessage msg, const rtMessageHeader *hdr, rbus_server::rbus_object *ptr)
+static void dispatch_method_call(rtMessage msg, const rtMessageHeader *hdr, server_object_t obj)
 {
     rtError err = RT_OK;
-    const char* method = NULL;
+    const char* method_name = NULL;
     rtMessage response = NULL;
     bool handler_invoked = false;
     
     rtMessage_BeginMetaSectionRead(msg);
-    err = rtMessage_GetString(msg, MESSAGE_FIELD_METHOD, &method);
+    err = rtMessage_GetString(msg, MESSAGE_FIELD_METHOD, &method_name);
     rtMessage_EndMetaSectionRead(msg);
     
     lock();
-    if((0 != ptr->num_registered_methods) && (RT_OK == err))
+    if( rtVector_Size(obj->methods) > 0 && RT_OK == err)
     {
-        /*If there are registered callbacks for this particular kind of message, dispatch them.*/
-        for(int i = 0; i < MAX_SUPPORTED_METHODS; i++)
+        server_method_t method = rtVector_Find(obj->methods, method_name, server_method_compare);
+
+        if(method)
         {
-            if(false == ptr->method_callbacks[i].method.empty())
-            {
-                if(0 == strncmp(method, ptr->method_callbacks[i].method.c_str(), MAX_METHOD_NAME_LENGTH))
-                {
-                    unlock();
-                    ptr->method_callbacks[i].callback(hdr->topic, method, msg, ptr->method_callbacks[i].data, &response); //FIXME: potential for race.
-                    handler_invoked = true;
-                    break;
-                }
-            }
+            unlock();
+            method->callback(hdr->topic, method_name, msg, method->data, &response); //FIXME: potential for race.
+            handler_invoked = true;
         }
     }
     if(false == handler_invoked)
     {
         unlock();
-        ptr->callback(hdr->topic, method, msg, ptr->data, &response); //FIXME: potential for race
+        obj->callback(hdr->topic, method_name, msg, obj->data, &response); //FIXME: potential for race
     }
 
     if(rtMessageHeader_IsRequest(hdr))
@@ -338,32 +432,29 @@ static void dispatch_method_call(rtMessage msg, const rtMessageHeader *hdr, rbus
 
 static void onMessage(rtMessageHeader const* hdr, rtMessage msg, void* closure)
 {
-    using namespace rbus_server;
+    /*using namespace rbus_server;*/
     static int stack_counter = 0;
     stack_counter++;
-    rbus_object * ptr = (rbus_object *)closure;
+    server_object_t obj = (server_object_t)closure;
 
     if(1 != stack_counter)
     {
         //We're in the midst of handling another request. Queue this one for later.
-        queued_request * req = new queued_request;
-        req->hdr = *hdr;
-        req->msg = msg;
-        req->obj = ptr;
-        request_queue.push_back(req);
+        queued_request_t req;
+        queued_request_create(&req, *hdr, msg, obj);
+        rtVector_PushBack(g_queued_requests, req);
     }
     else
-        dispatch_method_call(msg, hdr, ptr);
+        dispatch_method_call(msg, hdr, obj);
 
-    if((1 == stack_counter) && !request_queue.empty())
+    if((1 == stack_counter) && rtVector_Size(g_queued_requests) > 0)
     {
         //Consume the request queue now that the earlier request has been fully handled.
-        while(!request_queue.empty())
+        while(rtVector_Size(g_queued_requests) > 0)
         {
-            queued_request *ptr = request_queue.front();
-            request_queue.pop_front();
-            dispatch_method_call(ptr->msg, &ptr->hdr, ptr->obj);
-            delete ptr;
+            queued_request_t req = rtVector_At(g_queued_requests, 0);
+            dispatch_method_call(req->msg, &req->hdr, req->obj);
+            rtVector_RemoveItem(g_queued_requests, req, rtVector_Cleanup_Free);
         }
     }
     stack_counter--;
@@ -372,20 +463,50 @@ static void onMessage(rtMessageHeader const* hdr, rtMessage msg, void* closure)
 
 static void configure_router_address()
 {
-    std::ifstream infile;
-    infile.open("/etc/rbus_client.conf");
-    if(infile.is_open())
-        infile >> g_daemon_address;
-    if(g_daemon_address.empty()) //TODO: Sanitize address.
-        g_daemon_address = default_daemon_address;
-    rtLog_Info("Broker address: %s", g_daemon_address.c_str());
+    FILE* fconfig = fopen("/etc/rbus_client.conf", "r");
+    if(fconfig)
+    {
+        size_t len;
+        char buff[MAX_DAEMON_ADDRESS_LEN] = {0};
+
+        /*locate the first word(block of printable text)*/
+        while(fgets(buff, MAX_DAEMON_ADDRESS_LEN, fconfig))
+        {
+            len = strlen(buff);
+            if(len > 0)
+            {
+                size_t idx1 = 0;
+
+                /*move past any leading space*/
+                while(idx1 < len && isspace(buff[idx1]))
+                    idx1++;
+
+                if(idx1 < len)
+                {
+                    size_t idx2 = idx1+1;
+
+                    /*move to end of word*/
+                    while(idx2 < len && !isspace(buff[idx2]))
+                        idx2++;
+
+                    if(idx2-idx1 > 0)
+                    {
+                        buff[idx2] = 0;
+                        strcpy(g_daemon_address, &buff[idx1]);
+                        break;
+                    }
+                }
+            }
+        }
+        fclose(fconfig);
+    }
+    rtLog_Info("Broker address: %s", g_daemon_address);
 }
 
 rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char * broker_address)
 {
 	rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
 	rtError result = RT_OK;
-	int i = 0;
 	if(NULL == component_name)
 	{
 		rtLog_Error("Invalid parameter.");
@@ -396,6 +517,7 @@ rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char 
 		rtLog_Error("A connection already exists. Cannot open a new one.");
 		return RTMESSAGE_BUS_ERROR_INVALID_STATE;
 	}
+	perform_init();
 	result = rtConnection_Create(&g_connection, component_name, broker_address);
 	if(RT_OK != result)
 	{
@@ -403,11 +525,11 @@ rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char 
 		g_connection = NULL;
 		return RTMESSAGE_BUS_ERROR_GENERAL;
 	}
-
+    /*
 	for(i = 0; i < MAX_REGISTERED_OBJECTS; i++)
 	{
-		g_object_table[i].callback = dummyOnMessage;
-	}
+		g_server_objects[i].callback = dummyOnMessage;
+	}*/
 	rtLog_Info("Successfully created connection for %s.", component_name );
 	return ret;
 }
@@ -433,7 +555,7 @@ rbus_error_t rbus_openBrokerConnection(const char * component_name)
         printf("subscription_t is no throw move constructible.");
 #endif
 	configure_router_address();
-	return rbus_openBrokerConnection2(component_name, g_daemon_address.c_str());
+	return rbus_openBrokerConnection2(component_name, g_daemon_address);
 }
 
 static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate)
@@ -490,49 +612,15 @@ static rbus_error_t send_subscription_request(const char * object_name, const ch
     return ret;
 }
 
-static void perform_clean_up()
-{
-    lock();
-    {
-        using namespace rbus_server;
-        rtLog_Info("Cleaning up server data if any.");
-        for(int i = 0; i < MAX_REGISTERED_OBJECTS; i++)
-        {
-            rbus_object *obj = &g_object_table[i];
-            obj->callback = dummyOnMessage;
-            obj->data = NULL;
-            obj->name[0] = '\0';
-            obj->process_event_subscriptions = false;
-            obj->num_registered_methods = 0;
-            obj->subscription_table.clear();
-            for(int j = 0; j < MAX_SUPPORTED_METHODS; j++)
-                obj->method_callbacks[j].method.clear();
-            obj->subscribe_handler_override = NULL;
-            obj->subscribe_handler_data = NULL;
-        }
-    }
-    {
-        using namespace rbus_client;
-        if(0 != g_event_subscriptions_for_client.size())
-        {
-            rtLog_Info("Cancelling active event subscriptions.");
-            unlock();
-            for(const auto &subscription : g_event_subscriptions_for_client)
-            {
-                for(const auto &event : subscription.event_list)
-                    send_subscription_request(subscription.object.c_str(), event.event_name.c_str(), false);
-            }
-            lock();
-            g_event_subscriptions_for_client.clear();
-        }
-    }
-    unlock();
-}
-
 rbus_error_t rbus_closeBrokerConnection()
 {
     rtError err = RT_OK;
-    perform_clean_up();
+    if(NULL == g_connection)
+    {
+        rtLog_Info("No connection exist to close.");
+        return RTMESSAGE_BUS_ERROR_INVALID_STATE;
+    }
+    perform_cleanup();
     err = rtConnection_Destroy(g_connection);
     if(RT_OK != err)
     {
@@ -548,8 +636,7 @@ rbus_error_t rbus_closeBrokerConnection()
 rbus_error_t rbus_registerObj(const char * object_name, rbus_callback_t handler, void * user_data)
 {
     rtError err = RT_OK;
-    int i = 0;
-    int insert_candidate_offset = MAX_REGISTERED_OBJECTS;
+    server_object_t obj = NULL;
 
     if(NULL == g_connection)
     {
@@ -571,97 +658,74 @@ rbus_error_t rbus_registerObj(const char * object_name, rbus_callback_t handler,
     }
 
     lock();
-    for(i = 0; i < MAX_REGISTERED_OBJECTS; i++)
+    obj = rtVector_Find(g_server_objects, object_name, server_object_compare);
+    unlock();
+    if(obj)
     {
-        if('\0' == g_object_table[i].name[0])
-        {
-            if(MAX_REGISTERED_OBJECTS == insert_candidate_offset)
-                insert_candidate_offset = i;
-        }
-        else if(0 == strncmp(object_name, g_object_table[i].name, MAX_OBJECT_NAME_LENGTH))
-        {
-            unlock();
-            rtLog_Error("%s is already registered. Rejecting duplicate registration.", object_name);
-            return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
-        }
+        rtLog_Error("%s is already registered. Rejecting duplicate registration.", object_name);
+        return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
     }
 
-    if(MAX_REGISTERED_OBJECTS != insert_candidate_offset)
+    server_object_create(&obj, object_name, handler, user_data);
+
+    //TODO: callback signature translation. rtMessage uses a significantly wider signature for callbacks. Translate to something simpler.
+    err = rtConnection_AddListener(g_connection, object_name, onMessage, obj);
+
+    if(RT_OK == err)
     {
-        g_object_table[insert_candidate_offset].callback = handler;
-        g_object_table[insert_candidate_offset].data = user_data;
-        strncpy(g_object_table[insert_candidate_offset].name, object_name, (MAX_OBJECT_NAME_LENGTH - 1));
-        g_object_table[insert_candidate_offset].num_registered_methods = 0;
-        g_object_table[insert_candidate_offset].subscribe_handler_override = NULL;
-        g_object_table[insert_candidate_offset].subscribe_handler_data = NULL;
+        size_t sz;
+
+        lock();
+        rtVector_PushBack(g_server_objects, obj);
+        sz = rtVector_Size(g_server_objects);
         unlock();
+        rtLog_Info("Registered object %s", object_name);
+        if(sz >= MAX_REGISTERED_OBJECTS)
+        {
+            rtLog_Warn("Number of registered objects is %lu", sz);
+        }
+        return RTMESSAGE_BUS_SUCCESS;
     }
     else
     {
-        unlock();
-        rtLog_Error("No free slots in object table.");
-        return RTMESSAGE_BUS_ERROR_GENERAL;
-    }
-
-    //TODO: callback signature translation. rtMessage uses a significantly wider signature for callbacks. Translate to something simpler.
-    err = rtConnection_AddListener(g_connection, object_name, onMessage, &g_object_table[insert_candidate_offset]);
-
-    if(RT_OK != err)
-    {
         rtLog_Error("Failed to register object. Error: 0x%x", err);
-        lock();
-        g_object_table[insert_candidate_offset].callback = dummyOnMessage;
-        g_object_table[insert_candidate_offset].name[0] = '\0';
-        unlock();
+        server_object_destroy(obj);
         return RTMESSAGE_BUS_ERROR_GENERAL;
     }
-
-    rtLog_Info("Registered object %s", object_name);
-    return RTMESSAGE_BUS_SUCCESS;
 }
 
-rbus_error_t rbus_registerMethod(const char * object_name, const char *method, rbus_callback_t handler, void * user_data)
+rbus_error_t rbus_registerMethod(const char * object_name, const char *method_name, rbus_callback_t handler, void * user_data)
 {
-    using namespace rbus_server;
+    /*using namespace rbus_server;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
-    if(MAX_METHOD_NAME_LENGTH <= strlen(method))
+    if(MAX_METHOD_NAME_LENGTH <= strlen(method_name))
         return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
 
     lock();
     //TODO: Check that method name length is within limits and search for duplicates
-    rbus_object * obj = get_object(object_name);
-    if(NULL != obj)
+    server_object_t obj = get_object(object_name);
+    if(obj)
     {
-        if(MAX_SUPPORTED_METHODS <= obj->num_registered_methods)
+        if(MAX_SUPPORTED_METHODS <= rtVector_Size(obj->methods))
         {
             rtLog_Error("Too many methods registered with object %s. Cannot register more.", object_name);
             ret = RTMESSAGE_BUS_ERROR_OUT_OF_RESOURCES;
         }
         else
         {
-            int j;
-            for(j = 0; j < MAX_SUPPORTED_METHODS; j++)
+            server_method_t method = rtVector_Find(obj->methods, method_name, server_method_compare);
+
+            if(method)
             {
-                if(0 == strncmp(method, obj->method_callbacks[j].method.c_str(), MAX_METHOD_NAME_LENGTH))
-                {
-                   unlock();
-                   rtLog_Error("Method %s is already registered,Rejecting duplicate registration.", method);
-                   return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
-                }
-                if(true == obj->method_callbacks[j].method.empty())
-                {
-                    obj->method_callbacks[j].method = method;
-                    obj->method_callbacks[j].callback = handler;
-                    obj->method_callbacks[j].data = user_data;
-                    obj->num_registered_methods++;
-                    rtLog_Info("Successfully registered method %s with object %s", method, object_name);
-                    break;
-                }
+               unlock();
+               rtLog_Error("Method %s is already registered,Rejecting duplicate registration.", method_name);
+               return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
             }
-            if(MAX_SUPPORTED_METHODS == j)
+            else
             {
-                rtLog_Error("Method table for %s has no free entries. Bad clean-up?", object_name);
-                ret = RTMESSAGE_BUS_ERROR_OUT_OF_RESOURCES;
+                server_method_create(&method, method_name, handler, user_data);
+                rtVector_PushBack(obj->methods, method);
+                rtLog_Info("Successfully registered method %s with object %s", method_name, object_name);
             }
         }
     }
@@ -675,29 +739,24 @@ rbus_error_t rbus_registerMethod(const char * object_name, const char *method, r
 }
 
 
-rbus_error_t rbus_unregisterMethod(const char * object_name, const char *method)
+rbus_error_t rbus_unregisterMethod(const char * object_name, const char *method_name)
 {
-    using namespace rbus_server;
+    /*using namespace rbus_server;*/
 	rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
 	lock();
 
-    rbus_object *obj = get_object(object_name);
-    if(NULL != obj)
+    server_object_t obj = get_object(object_name);
+    if(obj)
     {
-        int j;
-        for(j = 0; j < MAX_SUPPORTED_METHODS; j++)
+        server_method_t method = rtVector_Find(obj->methods, method_name, server_method_compare);
+        if(method)
         {
-            if(0 == strncmp(method, obj->method_callbacks[j].method.c_str(), MAX_METHOD_NAME_LENGTH))
-            {
-                obj->method_callbacks[j].method.clear();
-                rtLog_Info("Successfully unregistered method %s from object %s", method, object_name);
-                obj->num_registered_methods--;
-                break;
-            }
+            rtVector_RemoveItem(obj->methods, method, rtVector_Cleanup_Free);
+            rtLog_Info("Successfully unregistered method %s from object %s", method_name, object_name);
         }
-        if(MAX_SUPPORTED_METHODS == j)
+        else
         {
-            rtLog_Error("Couldn't find a method %s registered with object %s.", method, object_name);
+            rtLog_Error("Couldn't find a method %s registered with object %s.", method_name, object_name);
             ret = RTMESSAGE_BUS_ERROR_GENERAL;
         }
     }
@@ -747,7 +806,7 @@ rbus_error_t rbus_unregisterMethodTable(const char * object_name, rbus_method_ta
 
 rbus_error_t rbus_unregisterObj(const char * object_name)
 {
-    using namespace rbus_server;
+    /*using namespace rbus_server;*/
     rtError err = RT_OK;
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
     if((NULL == object_name) || ('\0' == object_name[0]) || (MAX_OBJECT_NAME_LENGTH <= strlen(object_name)))
@@ -761,19 +820,10 @@ rbus_error_t rbus_unregisterObj(const char * object_name)
         return RTMESSAGE_BUS_ERROR_GENERAL;
 
     lock();
-    rbus_object *obj = get_object(object_name);
+    server_object_t obj = get_object(object_name);
     if(NULL != obj)
     {
-        obj->callback = dummyOnMessage;
-        obj->data = NULL;
-        obj->name[0] = '\0';
-        obj->process_event_subscriptions = false;
-        obj->num_registered_methods = 0;
-        obj->subscription_table.clear();
-        for(int j = 0; j < MAX_SUPPORTED_METHODS; j++)
-            obj->method_callbacks[j].method.clear();
-        obj->subscribe_handler_override = NULL;
-        obj->subscribe_handler_data = NULL;
+        rtVector_RemoveItem(g_server_objects, obj, server_object_destroy);
         rtLog_Info("Unregistered object %s.", object_name);
     }
     else
@@ -981,13 +1031,14 @@ rbus_error_t rbus_sendMessage(rtMessage message, const char * destination, const
 
 void ack();
 
-static int subscription_handler(const char *, const char * method_name, rtMessage in, void * user_data, rtMessage *out)
+static int subscription_handler(const char *not_used, const char * method_name, rtMessage in, void * user_data, rtMessage *out)
 {
-    using namespace rbus_server;
+    /*using namespace rbus_server;*/
     const char * sender = NULL;
     const char * event_name = NULL;
-    rbus_object *obj = (rbus_object *)user_data;
-    
+    server_object_t obj = (server_object_t)user_data;
+    (void)not_used;
+
     if(RT_OK != rtMessage_Create(out))
     {
         rtLog_Error("Unable to create response message.");
@@ -1005,15 +1056,8 @@ static int subscription_handler(const char *, const char * method_name, rtMessag
         }
         else
         {
-            rbus_error_t ret;
-            if(0 == strncmp(method_name, METHOD_ADD_EVENT_SUBSCRIPTION, MAX_METHOD_NAME_LENGTH))
-            {
-                ret = obj->addSubscriber(event_name, sender);
-            }
-            else
-            {
-                ret = obj->removeSubscriber(event_name, sender);
-            }
+            int added = strncmp(method_name, METHOD_ADD_EVENT_SUBSCRIPTION, MAX_METHOD_NAME_LENGTH) == 0 ? 1 : 0;
+            rbus_error_t ret = server_object_subscription_handler(obj, event_name, sender, added);
             rtMessage_SetInt32(*out, MESSAGE_FIELD_RESULT, ret);
         }
     }
@@ -1022,71 +1066,76 @@ static int subscription_handler(const char *, const char * method_name, rtMessag
 }
 
 
-static rbus_error_t install_subscription_handlers(rbus_server::rbus_object &object)
+static rbus_error_t install_subscription_handlers(server_object_t object)
 {
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS; 
-    int j;
-    for(j = 0; j < MAX_SUPPORTED_METHODS; j++)
+
+    server_method_t method = rtVector_Find(object->methods, METHOD_ADD_EVENT_SUBSCRIPTION, server_method_compare);
+
+    if(method)
     {
-        if(object.method_callbacks[j].method == METHOD_ADD_EVENT_SUBSCRIPTION)
-        {
-            rtLog_Info("Object already accepts subscription requests.");
-            return ret;
-        }
+        rtLog_Info("Object already accepts subscription requests.");
+        return ret;
     }
 
     /*No subscription handlers present. Add them.*/
-    rtLog_Info("Adding handler for subscription requests for %s.", object.name);
-    if((ret = rbus_registerMethod(object.name, METHOD_ADD_EVENT_SUBSCRIPTION, subscription_handler, &object)) != RTMESSAGE_BUS_SUCCESS)
+    rtLog_Info("Adding handler for subscription requests for %s.", object->name);
+    if((ret = rbus_registerMethod(object->name, METHOD_ADD_EVENT_SUBSCRIPTION, subscription_handler, object)) != RTMESSAGE_BUS_SUCCESS)
     {
         rtLog_Error("Could not register add_subscription_handler.");
     }
     else
     {
-        if((ret = rbus_registerMethod(object.name, METHOD_REMOVE_EVENT_SUBSCRIPTION, subscription_handler, &object)) != RTMESSAGE_BUS_SUCCESS)
+        if((ret = rbus_registerMethod(object->name, METHOD_REMOVE_EVENT_SUBSCRIPTION, subscription_handler, object)) != RTMESSAGE_BUS_SUCCESS)
         {
             rtLog_Error("Could not register remove_subscription_handler.");
         }
         else
         {
-            rtLog_Info("Successfully registered subscription handlers for %s.", object.name);
-            object.process_event_subscriptions = true;
+            rtLog_Info("Successfully registered subscription handlers for %s.", object->name);
+            object->process_event_subscriptions = true;
         }
     }
     return ret;
 }
 
-rbus_error_t rbus_registerEvent(const char* object_name, const char * event, rbus_event_subscribe_callback_t callback, void * user_data)
+rbus_error_t rbus_registerEvent(const char* object_name, const char * event_name, rbus_event_subscribe_callback_t callback, void * user_data)
 {
-    using namespace rbus_server;
+    /*using namespace rbus_server;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+    server_object_t obj;
 
-    if(NULL == event)
-        event = DEFAULT_EVENT;
+    if(NULL == event_name)
+        event_name = DEFAULT_EVENT;
     if(NULL == object_name)
     {
         rtLog_Error("Invalid parameter(s)");
         return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
     }
+    if(MAX_EVENT_NAME_LENGTH <= strnlen(event_name, MAX_EVENT_NAME_LENGTH))
+    {
+        rtLog_Error("Event name is too long.");
+        return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+    }
 
     lock();
-    rbus_object *obj = get_object(object_name);
-    if(NULL != obj)
+    obj = get_object(object_name);
+    if(obj)
     {
-        const auto iter = std::find_if(obj->subscription_table.begin(), obj->subscription_table.end(), 
-                [&event](const event_entry_t &entry) -> bool { return (entry.event_name == event); });
+        server_event_t evt = rtVector_Find(obj->subscriptions, event_name, server_event_compare);
 
-        if(obj->subscription_table.end() != iter)
+        if(evt)
         {
-            rtLog_Info("Event %s already exists in subscription table.", event);
+            rtLog_Info("Event %s already exists in subscription table.", event_name);
         }
         else
         {
-            obj->subscription_table.emplace_back(event, obj, callback, user_data);
-            rtLog_Info("Registered event %s::%s.", object_name, event);
+            server_event_create(&evt, event_name, obj, callback, user_data);
+            rtVector_PushBack(obj->subscriptions, evt);
+            rtLog_Info("Registered event %s::%s.", object_name, event_name);
         }
-        if(false == obj->process_event_subscriptions)
-            ret = install_subscription_handlers(*obj);
+        if(!obj->process_event_subscriptions)
+            ret = install_subscription_handlers(obj);
     }
     else
     {
@@ -1097,30 +1146,29 @@ rbus_error_t rbus_registerEvent(const char* object_name, const char * event, rbu
     return ret;
 }
 
-rbus_error_t rbus_unregisterEvent(const char* object_name, const char * event)
+rbus_error_t rbus_unregisterEvent(const char* object_name, const char * event_name)
 {
-    using namespace rbus_server;
+    /*using namespace rbus_server;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
-    if(NULL == event)
-        event = DEFAULT_EVENT;
+    if(NULL == event_name)
+        event_name = DEFAULT_EVENT;
 
     lock();
 
-    rbus_object *obj = get_object(object_name);
-    if(NULL != obj)
+    server_object_t obj = get_object(object_name);
+    if(obj)
     {
-        const auto iter = std::find_if(obj->subscription_table.begin(), obj->subscription_table.end(), 
-                [&event](const event_entry_t &entry) -> bool { return (entry.event_name == event); });
+        server_event_t evt = rtVector_Find(obj->subscriptions, event_name, server_event_compare);
 
-        if(obj->subscription_table.end() != iter)
+        if(evt)
         {
-            obj->subscription_table.erase(iter);
-            rtLog_Info("Event %s::%s has been unregistered.", object_name, event);
+            rtVector_RemoveItem(obj->subscriptions, evt, server_event_destroy);
+            rtLog_Info("Event %s::%s has been unregistered.", object_name, event_name);
             /* If we've removed all events and RPC registrations, delete the object itself.*/
         }
         else
         {
-            rtLog_Info("Event %s could not be found in subscription table of object %s.", event, object_name);
+            rtLog_Info("Event %s could not be found in subscription table of object %s.", event_name, object_name);
             ret = RTMESSAGE_BUS_ERROR_INVALID_PARAM;
         }
     }
@@ -1135,10 +1183,12 @@ rbus_error_t rbus_unregisterEvent(const char* object_name, const char * event)
 }
 static void master_event_callback(const rtMessageHeader* hdr, rtMessage msg, void* closure)
 {
-    using namespace rbus_client;
+    /*using namespace rbus_client;*/
     const char * sender = hdr->reply_topic;
     const char * event_name = NULL;
     rtError err;
+    size_t subs_len;
+    size_t i;
     (void)closure;
     
     /*Sanitize the incoming data.*/
@@ -1157,19 +1207,20 @@ static void master_event_callback(const rtMessageHeader* hdr, rtMessage msg, voi
     }
     
     lock();
-    for(auto &entry : g_event_subscriptions_for_client)
+    subs_len = rtVector_Size(g_event_subscriptions_for_client);
+    for(i = 0; i < subs_len; ++i)
     {
-        if(entry.object == sender
-        || entry.object == event_name /* support rbus events being elements : the object name will be the event name */
-        )
-        {
-            const auto iter = std::find_if(entry.event_list.begin(), entry.event_list.end(), 
-                    [&event_name](const subscription_t::event_entry_t &event) -> bool { return (event.event_name == event_name); });
+        client_subscription_t sub = rtVector_At(g_event_subscriptions_for_client, i);
 
-            if(entry.event_list.end() != iter)
+        if( strncmp(sub->object, sender, MAX_OBJECT_NAME_LENGTH) == 0 ||
+            strncmp(sub->object, event_name, MAX_OBJECT_NAME_LENGTH) == 0 ) /* support rbus events being elements : the object name will be the event name */
+        {
+            client_event_t evt = rtVector_Find(sub->events, event_name, client_event_compare);
+
+            if(evt)
             {
                 unlock();
-                iter->callback(sender, event_name, msg, iter->user_data);
+                evt->callback(sender, event_name, msg, evt->data);
                 return;
             }
             /* support rbus events being elements : keep searching */
@@ -1184,37 +1235,30 @@ static void master_event_callback(const rtMessageHeader* hdr, rtMessage msg, voi
 
 static rbus_error_t remove_subscription_callback(const char * object_name,  const char * event_name)
 {
-    using namespace rbus_client;
+    /*using namespace rbus_client;*/
+    client_subscription_t sub;
     rbus_error_t ret = RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+
     lock();
-    
-    for(auto entry = g_event_subscriptions_for_client.begin(); entry != g_event_subscriptions_for_client.end(); entry++)
+    sub = rtVector_Find(g_event_subscriptions_for_client, object_name, client_subscription_compare);
+    if(sub)
     {
-        /*First, search for existing entries for the same object.*/
-        if(entry->object == object_name)
+        client_event_t evt = rtVector_Find(sub->events, event_name, client_event_compare);
+        if(evt)
         {
-            /*Check whether a matching event subscription exists for this object.*/
-            const auto iter = std::find_if(entry->event_list.begin(), entry->event_list.end(), 
-                    [&event_name](const subscription_t::event_entry_t &event) -> bool { return (event.event_name == event_name); });
+            rtVector_RemoveItem(sub->events, evt, rtVector_Cleanup_Free);
+            rtLog_Info("Subscription removed for event %s::%s.", object_name, event_name);
+            ret = RTMESSAGE_BUS_SUCCESS;
 
-            if(entry->event_list.end() != iter)
+            if(rtVector_Size(sub->events) == 0)
             {
-                entry->event_list.erase(iter);
-                rtLog_Info("Subscription removed for event %s::%s.", object_name, event_name);
-                ret = RTMESSAGE_BUS_SUCCESS;
-
-                if(true == entry->event_list.empty())
-                {
-                    /*No more registrations exist for this object. Remove it altogether.*/
-                    rtLog_Info("Zero event subscriptions remaining for object %s. Cleaning up.", object_name);
-                    g_event_subscriptions_for_client.erase(entry);
-                }
+                rtLog_Info("Zero event subscriptions remaining for object %s. Cleaning up.", object_name);
+                rtVector_RemoveItem(g_event_subscriptions_for_client, sub, client_subscription_destroy);
             }
-            else
-            {
-                rtLog_Warn("Subscription for event %s::%s not found.", object_name, event_name);
-            }
-            break;
+        }
+        else
+        {
+            rtLog_Warn("Subscription for event %s::%s not found.", object_name, event_name);
         }
     }
     unlock();
@@ -1223,8 +1267,10 @@ static rbus_error_t remove_subscription_callback(const char * object_name,  cons
 
 rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event_name, rbus_event_callback_t callback, void * user_data)
 {
-    using namespace rbus_client;
+    /*using namespace rbus_client;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+    client_subscription_t sub;
+    client_event_t evt;
 
     /* support rbus events being elements : use the event_name as the object_name because event_name is alias to object */
     if(object_name == NULL && event_name != NULL) 
@@ -1240,6 +1286,12 @@ rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event
         rtLog_Error("Object name is too long.");
         return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
     }
+    if(MAX_EVENT_NAME_LENGTH <= strnlen(event_name, MAX_EVENT_NAME_LENGTH))
+    {
+        rtLog_Error("Event name is too long.");
+        return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+    }
+
     lock();
    
     if(NULL == event_name)
@@ -1252,34 +1304,28 @@ rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event
         g_run_event_client_dispatch = true;
     }
 
-    bool subscription_added = false;
-    for(auto &entry : g_event_subscriptions_for_client)
+    sub = rtVector_Find(g_event_subscriptions_for_client, object_name, client_subscription_compare);
+    if(sub)
     {
-        /*First, search for existing entries for the same object.*/
-        if(entry.object == object_name)
+        if(rtVector_Find(sub->events, event_name, client_event_compare))
         {
-            const auto iter = std::find_if(entry.event_list.begin(), entry.event_list.end(), 
-                    [&event_name](const subscription_t::event_entry_t &event) -> bool { return (event.event_name == event_name); });
-
-            if(entry.event_list.end() != iter)
-            {
-                rtLog_Warn("Subscription exists for event %s::%s.", object_name, event_name);
-                unlock();
-                return RTMESSAGE_BUS_SUCCESS;
-            }
-            else
-            {
-                entry.event_list.emplace_back(event_name, callback, user_data);
-                rtLog_Info("Added subscription for event %s::%s.", object_name, event_name);
-            }
-            subscription_added = true;
-            break;
+            /*sub already exist and event already registered so do nothing*/
+            rtLog_Warn("Subscription exists for event %s::%s.", object_name, event_name);
+            unlock();
+            return RTMESSAGE_BUS_SUCCESS;
         }
-
     }
-    /* If no matching objects exist in records. Create a new entry.*/
-    if(false == subscription_added)
-        g_event_subscriptions_for_client.emplace_back(object_name, event_name, callback, user_data);
+    else
+    {
+        /*sub didn't exist so create it*/
+        client_subscription_create(&sub, object_name);
+        rtVector_PushBack(g_event_subscriptions_for_client, sub);
+    }
+
+    /*create event and add to sub*/
+    client_event_create(&evt, event_name, callback, user_data);
+    rtVector_PushBack(sub->events, evt);
+    rtLog_Info("Added subscription for event %s::%s.", object_name, event_name);
 
     unlock();
 
@@ -1322,7 +1368,7 @@ rbus_error_t rbus_unsubscribeFromEvent(const char * object_name,  const char * e
 
 rbus_error_t rbus_publishEvent(const char* object_name,  const char * event_name, rtMessage out)
 {
-    using namespace rbus_server;
+    /*using namespace rbus_server;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
     if(NULL == event_name)
         event_name = DEFAULT_EVENT;
@@ -1337,21 +1383,24 @@ rbus_error_t rbus_publishEvent(const char* object_name,  const char * event_name
     rtMessage_EndMetaSectionWrite(out);
 
     lock();
-    rbus_object *obj = get_object(object_name);
-    if(NULL != obj)
+    server_object_t obj = get_object(object_name);
+    if(obj)
     {
-        const auto iter = std::find_if(obj->subscription_table.begin(), obj->subscription_table.end(), 
-                [&event_name](const event_entry_t &entry) -> bool { return (entry.event_name == event_name); });
+        server_event_t evt = rtVector_Find(obj->subscriptions, event_name, server_event_compare);
 
-        if(obj->subscription_table.end() != iter)
+        if(evt)
         {
-            rtLog_Debug("Event %s exists in subscription table. Dispatching to %lu subscribers.", event_name, iter->listeners.size());
-            for(const auto & listener : iter->listeners)
+            size_t nlistener, i;
+
+            nlistener = rtVector_Size(evt->listeners);
+            rtLog_Debug("Event %s exists in subscription table. Dispatching to %lu subscribers.", event_name, nlistener);
+            for(i=0; i < nlistener; ++i)
             {
-               if(RTMESSAGE_BUS_SUCCESS != rbus_sendMessage(out, listener.c_str(), object_name))
-               {
-                   rtLog_Error("Couldn't send event %s::%s to %s.", object_name, event_name, listener.c_str());
-               }
+                char const* listener = (char const*)rtVector_At(evt->listeners, i);
+                if(RTMESSAGE_BUS_SUCCESS != rbus_sendMessage(out, listener, object_name))
+                {
+                    rtLog_Error("Couldn't send event %s::%s to %s.", object_name, event_name, listener);
+                }
             }
         }
         else
@@ -1373,7 +1422,7 @@ rbus_error_t rbus_publishEvent(const char* object_name,  const char * event_name
 
 rbus_error_t rbus_registerSubscribeHandler(const char* object_name, rbus_event_subscribe_callback_t callback, void * user_data)
 {
-    using namespace rbus_server;
+    /*using namespace rbus_server;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
 
     if((NULL == object_name) || (NULL == callback))
@@ -1383,13 +1432,13 @@ rbus_error_t rbus_registerSubscribeHandler(const char* object_name, rbus_event_s
     }
 
     lock();
-    rbus_object *obj = get_object(object_name);
-    if(NULL != obj)
+    server_object_t obj = get_object(object_name);
+    if(obj)
     {
         obj->subscribe_handler_override = callback;
         obj->subscribe_handler_data = user_data;
-        if(false == obj->process_event_subscriptions)
-            ret = install_subscription_handlers(*obj);
+        if(!obj->process_event_subscriptions)
+            ret = install_subscription_handlers(obj);
     }
     else
     {
@@ -1402,7 +1451,7 @@ rbus_error_t rbus_registerSubscribeHandler(const char* object_name, rbus_event_s
 
 rbus_error_t rbus_publishSubscriberEvent(const char* object_name,  const char * event_name, const char* listener, rtMessage out)
 {
-    using namespace rbus_server;
+    /*using namespace rbus_server;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
     if(NULL == event_name)
         event_name = DEFAULT_EVENT;
@@ -1416,7 +1465,7 @@ rbus_error_t rbus_publishSubscriberEvent(const char* object_name,  const char * 
     rbus_SetString(out, MESSAGE_FIELD_EVENT_SENDER, object_name); 
     rtMessage_EndMetaSectionWrite(out);
     lock();
-    rbus_object *obj = get_object(object_name);
+    server_object_t obj = get_object(object_name);
     if(NULL == obj)
     {
         /*Object not present yet. Register it now.*/
@@ -1514,7 +1563,7 @@ rbus_error_t rbus_findMatchingObjects(const char* elements[], const int len, cha
     rbus_AppendInt32(out, len);
     for(int i = 0; i < len; i++)
     {
-        if(nullptr != elements[i])
+        if(NULL != elements[i])
             rbus_AppendString(out, elements[i]);
         else
         {
@@ -1528,17 +1577,17 @@ rbus_error_t rbus_findMatchingObjects(const char* elements[], const int len, cha
     if(RT_OK == err)
     {
         int result;
-        const char * value = nullptr;
+        const char * value = NULL;
         if((RT_OK == rbus_PopInt32(in, &result)) && (RTM_DISCOVERY_RESULT_SUCCESS == result))
         {
             char **array_ptr = (char **)malloc(len * sizeof(char *));
-            if (nullptr != array_ptr)
+            if (NULL != array_ptr)
             {
                 *objects = array_ptr;
                 memset(array_ptr, 0, (len * sizeof(char *)));
                 for (int i = 0; i < len; i++)
                 {
-                    if ((RT_OK != rbus_PopString(in, &value)) || (nullptr == (array_ptr[i] = strndup(value, MAX_OBJECT_NAME_LENGTH))))
+                    if ((RT_OK != rbus_PopString(in, &value)) || (NULL == (array_ptr[i] = strndup(value, MAX_OBJECT_NAME_LENGTH))))
                     {
                         for (int j = 0; j < i; j++)
                             free(array_ptr[j]);

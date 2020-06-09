@@ -31,11 +31,11 @@ Test server for unit test client testing
 
 static char data[100] = "init init init";
 
-static test_struct_t test_struct1 = {};
-static test_struct_t test_struct2 = {} ;
-static test_array_data_t test_array1 = {};
+static test_struct_t test_struct1 = {{0},0,0};
+static test_struct_t test_struct2 = {{0},0,0};
+static test_array_data_t test_array1 = {{0},0};
 
-student_details_t student_data[100] = {};
+student_details_t student_data[100] = {{{0},{0}}};
 int count = 0;
 
 void reset_stored_data()
@@ -51,24 +51,26 @@ void reset_stored_data()
     count = 0;
 }
 
-int handle_get1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+int handle_get1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     rbus_SetString(*response, MESSAGE_FIELD_PAYLOAD, data);
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
     return 0;
 }
 
-int handle_set1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+int handle_set1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) response;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtError err = RT_OK;
     const char * payload = NULL;
     if((err = rbus_GetString(request, MESSAGE_FIELD_PAYLOAD, &payload) == RT_OK)) //TODO: Should payload be freed?
@@ -79,24 +81,26 @@ int handle_set1(const char * destination, const char * method, rtMessage request
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
     return 0;
 }
-int handle_get2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+int handle_get2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     rbus_SetString(*response, MESSAGE_FIELD_PAYLOAD, data);
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
     return 0;
 }
 
-int handle_set2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+int handle_set2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) response;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtError err = RT_OK;
     const char * payload = NULL;
     if((err = rbus_GetString(request, MESSAGE_FIELD_PAYLOAD, &payload) == RT_OK))
@@ -108,12 +112,13 @@ int handle_set2(const char * destination, const char * method, rtMessage request
     return 0;
 }
 
-int handle_getStudentInfo(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+int handle_getStudentInfo(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     int i;
     rtMessage_Create(response);
     for(i = 0; i <count; i++)
@@ -126,12 +131,13 @@ int handle_getStudentInfo(const char * destination, const char * method, rtMessa
     return 0;
 }
 
-int handle_setStudentInfo(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+int handle_setStudentInfo(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) response;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtError err = RT_OK;
     const char * payload = NULL;
 
@@ -149,23 +155,25 @@ int handle_setStudentInfo(const char * destination, const char * method, rtMessa
     return 0;
 }
 
-int handle_getBinaryData(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+int handle_getBinaryData(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     rbus_AddBinaryData(*response, MESSAGE_FIELD_PAYLOAD, (void *)&test_array1, sizeof(test_array1));
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
     return 0;
 }
 
-int handle_setBinaryData(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+int handle_setBinaryData(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtError err = RT_OK;
     const test_array_data_t *payload;
     unsigned int size = 0;
@@ -179,12 +187,13 @@ int handle_setBinaryData(const char * destination, const char * method, rtMessag
     return 0;
 }
 
-int handle_getAttributes1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+int handle_getAttributes1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     rbus_SetString(*response, MESSAGE_FIELD_PAYLOAD, data);
     rbus_SetString(*response, "name", test_struct1.name);
@@ -192,11 +201,12 @@ int handle_getAttributes1(const char * destination, const char * method, rtMessa
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
     return 0;
 }
-int handle_setAttributes1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+int handle_setAttributes1(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     rbus_SetString(*response, MESSAGE_FIELD_PAYLOAD, data);
     rtError err = RT_OK;
@@ -211,12 +221,13 @@ int handle_setAttributes1(const char * destination, const char * method, rtMessa
     return 0;
 }
 
-int handle_getAttributes2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+int handle_getAttributes2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     rbus_SetString(*response, MESSAGE_FIELD_PAYLOAD, data);
     rbus_SetString(*response, "name", test_struct2.name);
@@ -224,11 +235,12 @@ int handle_getAttributes2(const char * destination, const char * method, rtMessa
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
     return 0;
 }
-int handle_setAttributes2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+int handle_setAttributes2(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     rbus_SetString(*response, MESSAGE_FIELD_PAYLOAD, data);
     rtError err = RT_OK;
@@ -243,18 +255,20 @@ int handle_setAttributes2(const char * destination, const char * method, rtMessa
     return 0;
 }
 
-void handle_unknown(const char * destination, const char * method, rtMessage request, rtMessage *response)
+void handle_unknown(const char * destination, const char * method, rtMessage request, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_ERROR_UNSUPPORTED_METHOD);
 }
 
-int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response)
+int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
+    (void) hdr;
     printf("Received message in base callback.\n");
     char* buff = NULL;
     uint32_t buff_length = 0;
@@ -264,6 +278,6 @@ int callback(const char * destination, const char * method, rtMessage message, v
     free(buff);
 
     /* Craft response message.*/
-    handle_unknown(destination, method, message, response);
+    handle_unknown(destination, method, message, response, hdr);
     return 0;
 }

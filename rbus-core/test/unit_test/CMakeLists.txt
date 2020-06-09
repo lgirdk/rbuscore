@@ -26,11 +26,11 @@ find_package(GTest QUIET)
 if (NOT GTEST_INCLUDE_DIR)
     message("Warning! GTest wasn't found. Unit test capabilities won't be built.")
 else ()
-    add_executable(rbus_test_server rbus_test_util.cpp rbus_test_server.cpp)
+    add_executable(rbus_test_server rbus_test_util.c rbus_test_server.c)
     add_dependencies(rbus_test_server rbus-core)
     target_link_libraries(rbus_test_server rbus-core)
 
-    add_executable(rbus_event_server rbus_test_util.cpp rbus_event_server.cpp)
+    add_executable(rbus_event_server rbus_test_util.c rbus_event_server.c)
     add_dependencies(rbus_event_server rbus-core)
     target_link_libraries(rbus_event_server rbus-core)
 
@@ -39,7 +39,7 @@ else ()
 
     add_executable(rbus_unit_test_app
                    rbus_unit_test_marshalling.cpp
-                   rbus_test_util.cpp
+                   rbus_test_util.c
                    rbus_unit_test_client.cpp
                    rbus_unit_stresstest_server.cpp
                    rbus_unit_test_server.cpp

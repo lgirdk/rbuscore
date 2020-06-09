@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
 
     const int in_length = 12;
     const char *inputs[] = {"foo", "foox.element1", "foox.element2", "bar", "barx.element1", "barx.element2", "abcd", "foox.", "barx.", "common.element1", "common.element2", "common."};
-    char **output = nullptr;
+    char **output = NULL;
     if(RTMESSAGE_BUS_SUCCESS == rbus_findMatchingObjects(inputs, in_length, &output))
     {
         printf("Multi-lookup returned success. Printing mapping information...\n");
