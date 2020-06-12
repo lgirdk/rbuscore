@@ -25,7 +25,7 @@ ConditionPathExists=/nvram/rbus_support
 Type=forking
 TimeoutSec=300
 ExecStart=/usr/bin/rtrouted $RTROUTER_OPTIONAL_ARGS
-ExecStopPost=/bin/sh -c "if [[ -e /lib/rdk/rbus_termination_handler.sh ]]; then /lib/rdk/rbus_termination_handler.sh; fi"
+ExecStop=/bin/sh -c 'echo 0 >> /tmp/rbus_stopped'
 Restart=no
 
 
