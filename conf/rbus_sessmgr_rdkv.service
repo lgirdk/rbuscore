@@ -17,16 +17,15 @@
 # limitations under the License.
 ##########################################################################
 [Unit]
-Description= An IPC framework
-After=rbus_session_mgr.service
+Description= Session manager for rbus
+#Although this will launch before rbus, it will block until rbus is available
+#and will be immediately available for any other processes once rbus is up.
+Before=rbus.service
 
 [Service]
-Type=forking
-TimeoutSec=300
-ExecStart=/usr/bin/rtrouted $RTROUTER_OPTIONAL_ARGS
-ExecStop=/bin/sh -c 'echo 0 >> /tmp/rbus_stopped'
+Type=simple
+ExecStart=/usr/bin/rbus_session_mgr
 Restart=no
-
 
 [Install]
 WantedBy=multi-user.target

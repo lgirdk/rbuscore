@@ -222,7 +222,7 @@ void rtLogPrintf(rtLogLevel level, const char* file, int line, const char* forma
   else if (RT_USE_RDKLOGGER == sOption)
   {
     rdk_LogLevel rdklevel = rdkLogLevelFromrtLogLevel(level);
-    RDK_LOG(rdklevel, "LOG.RDK.RBUS.RTMESSAGE", "%s(%d) :%s\n", path, line, buff);
+    RDK_LOG(rdklevel, "LOG.RDK.RTMESSAGE", "%s(%d) :%s\n", path, line, buff);
   }
 #endif
   else
