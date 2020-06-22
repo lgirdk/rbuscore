@@ -34,7 +34,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-typedef int (*rbus_callback_t)(const char * destination, const char * method, rtMessage in, void * user_data, rtMessage *out);
+typedef int (*rbus_callback_t)(const char * destination, const char * method, rtMessage in, void * user_data, rtMessage *out, const rtMessageHeader* hdr);
 typedef int (*rbus_async_callback_t)(rtMessage message, void * user_data);
 typedef int (*rbus_event_callback_t)(const char * object_name,  const char * event_name, rtMessage message, void * user_data);
 typedef int (*rbus_timed_update_event_callback_t)(rtMessage *message);
@@ -175,6 +175,9 @@ rbus_error_t rbus_findMatchingObjects(const char* elements[], const int len, cha
 
 /* Get the rbus status; to find out whether the rbus is enabled or not. The application can take action (ex: registration of events) based on this return value. */
 rbuscore_bus_status_t rbuscore_checkBusStatus(void);
+
+rbus_error_t rbus_sendResponse(const rtMessageHeader* hdr, rtMessage response);
+
 #ifdef __cplusplus
 }
 #endif

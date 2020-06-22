@@ -28,12 +28,13 @@
 static int g_counter;
 static int g_current_session_id;
 
-static int request_session_id(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+static int request_session_id(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     if(0 == g_current_session_id)
     {
@@ -50,12 +51,13 @@ static int request_session_id(const char * destination, const char * method, rtM
     return 0;
 }
 
-static int get_session_id(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+static int get_session_id(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     printf("Current session id is %d\n", g_current_session_id);
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
@@ -63,11 +65,12 @@ static int get_session_id(const char * destination, const char * method, rtMessa
     return 0;
 }
 
-static int end_session(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+static int end_session(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     int sessionid = 0;
     rbus_error_t result = RTMESSAGE_BUS_SUCCESS;
@@ -96,12 +99,13 @@ static int end_session(const char * destination, const char * method, rtMessage 
 }
 
 
-static int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response)
+static int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) response;
     (void) destination;
     (void) method;
+    (void) hdr;
     printf("Received message in base callback.\n");
     char* buff = NULL;
     uint32_t buff_length = 0;
