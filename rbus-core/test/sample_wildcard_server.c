@@ -27,11 +27,12 @@
 static char data1[100] = "wifi init init init";
 static char data2[100] = "tr69 init init init";
 
-static int handle_get(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+static int handle_get(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) destination;
     (void) method;
     (void) request;
+    (void) hdr;
     rtMessage_Create(response);
     printf("calling get %s, ptr %p\n", (const char *)user_data, user_data);
     rbus_AppendInt32(*response,  RTMESSAGE_BUS_SUCCESS);
@@ -39,10 +40,11 @@ static int handle_get(const char * destination, const char * method, rtMessage r
     return 0;
 }
 
-static int handle_set(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+static int handle_set(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) destination;
     (void) method;
+    (void) hdr;
     rtError err = RT_OK;
     const char * payload = NULL;
     printf("calling set %s\n", (const char *)user_data);
@@ -55,12 +57,13 @@ static int handle_set(const char * destination, const char * method, rtMessage r
     return 0;
 }
 
-static int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response)
+static int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) destination;
     (void) method;
     (void) user_data;
     (void) response;
+    (void) hdr;
     printf("Received message in base callback.\n");
     char* buff = NULL;
     uint32_t buff_length = 0;

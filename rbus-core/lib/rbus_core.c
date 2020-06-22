@@ -402,32 +402,18 @@ static void dispatch_method_call(rtMessage msg, const rtMessageHeader *hdr, serv
         if(method)
         {
             unlock();
-            method->callback(hdr->topic, method_name, msg, method->data, &response); //FIXME: potential for race.
+            method->callback(hdr->topic, method_name, msg, method->data, &response, hdr); //FIXME: potential for race.
             handler_invoked = true;
         }
     }
     if(false == handler_invoked)
     {
         unlock();
-        obj->callback(hdr->topic, method_name, msg, obj->data, &response); //FIXME: potential for race
+        if(obj->callback(hdr->topic, method_name, msg, obj->data, &response, hdr) == RTMESSAGE_BUS_SUCCESS_ASYNC) //FIXME: potential for race
+            return;/*provider will send response async later on*/
     }
-
-    if(rtMessageHeader_IsRequest(hdr))
-    {
-        /* The origin of this message expects a response.*/
-        if(NULL == response)
-        {
-            /* App declined to issue a response. Make one up ourselves. */
-            rtMessage_Create(&response);
-            rtMessage_SetInt32(response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_ERROR_UNSUPPORTED_METHOD);
-        }
-        set_message_method(response, METHOD_RESPONSE);
-        if((err= rtConnection_SendResponse(g_connection, hdr, response, TIMEOUT_VALUE_FIRE_AND_FORGET)) != RT_OK)
-        {
-            rtLog_Error("Failed to send response to incoming message. Error code: 0x%x", err);
-        }
-        rtMessage_Release(response);
-    }
+    
+    rbus_sendResponse(hdr, response);
 }
 
 static void onMessage(rtMessageHeader const* hdr, rtMessage msg, void* closure)
@@ -1031,8 +1017,9 @@ rbus_error_t rbus_sendMessage(rtMessage message, const char * destination, const
 
 void ack();
 
-static int subscription_handler(const char *not_used, const char * method_name, rtMessage in, void * user_data, rtMessage *out)
+static int subscription_handler(const char *not_used, const char * method_name, rtMessage in, void * user_data, rtMessage *out, const rtMessageHeader* hdr)
 {
+    (void) hdr;
     /*using namespace rbus_server;*/
     const char * sender = NULL;
     const char * event_name = NULL;
@@ -1643,4 +1630,27 @@ rbuscore_bus_status_t rbuscore_checkBusStatus(void)
         return RBUSCORE_DISABLED;
     }
 #endif /* RBUS_ALWAYS_ON */
+}
+
+rbus_error_t rbus_sendResponse(const rtMessageHeader* hdr, rtMessage response)
+{
+    rtError err = RT_OK;
+
+    if(rtMessageHeader_IsRequest(hdr))
+    {
+        /* The origin of this message expects a response.*/
+        if(NULL == response)
+        {
+            /* App declined to issue a response. Make one up ourselves. */
+            rtMessage_Create(&response);
+            rtMessage_SetInt32(response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_ERROR_UNSUPPORTED_METHOD);
+        }
+        set_message_method(response, METHOD_RESPONSE);
+        if((err= rtConnection_SendResponse(g_connection, hdr, response, TIMEOUT_VALUE_FIRE_AND_FORGET)) != RT_OK)
+        {
+            rtLog_Error("Failed to send async response. Error code: 0x%x", err);
+        }
+        rtMessage_Release(response);
+    }
+    return err == RT_OK ? RTMESSAGE_BUS_SUCCESS : RTMESSAGE_BUS_ERROR_GENERAL;
 }

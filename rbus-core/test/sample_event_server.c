@@ -27,9 +27,10 @@
 static char data1[100] = "obj1 init init init";
 static char data2[100] = "obj2 init init init";
 
-static int handle_get(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+static int handle_get(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
+    (void) hdr;
     rtMessage_Create(response);
     printf("%s::%s %s, ptr %p\n", destination, method, (const char *)user_data, user_data);
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
@@ -37,8 +38,9 @@ static int handle_get(const char * destination, const char * method, rtMessage r
     return 0;
 }
 
-static int handle_set(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response)
+static int handle_set(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
+    (void) hdr;
     rtError err = RT_OK;
     const char * payload = NULL;
     printf("calling set %s\n", (const char *)user_data);
@@ -52,12 +54,13 @@ static int handle_set(const char * destination, const char * method, rtMessage r
     return 0;
 }
 
-static int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response)
+static int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) response;
     (void) destination;
     (void) method;
+    (void) hdr;
     printf("Received message in base callback.\n");
     char* buff = NULL;
     uint32_t buff_length = 0;
