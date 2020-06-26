@@ -1,0 +1,6 @@
+[Unit]
+Description=RBus IPC Restart Service
+
+[Service]
+Type=simple
+ExecStart=/bin/sh -c "if [[ -e /lib/rdk/rbus_termination_handler.sh ]]; then /lib/rdk/rbus_termination_handler.sh; fi"
