@@ -44,7 +44,11 @@ typedef struct
 
 
 char eventserver_kill[] = "pkill -9 -f rbus_event_server";
+#ifdef BUILD_FOR_DESKTOP
 char eventserver_create[] = "./rbus_event_server alpha > /tmp/outp.txt  2>&1 &";
+#else
+char eventserver_create[] = "/usr/bin/rbus_event_server alpha > /tmp/outp.txt  2>&1 &";
+#endif
 
 class EventClientAPIs : public ::testing::Test{
 
@@ -201,7 +205,7 @@ TEST_F(EventClientAPIs, rbus_unsubscribeFromEvent_test1)
     ASSERT_EQ(conn_status, true) << "RBUS_OPEN_BROKER_CONNECTION failed";
     //Test with objname to be NULL
     err = rbus_unsubscribeFromEvent(NULL, "event_1");
-    ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_INVALID_PARAM) << "rbus_unsubscribeFromEvent failed";
+    ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_REMOTE_END_FAILED_TO_RESPOND) << "rbus_unsubscribeFromEvent failed";
    //Test with the event name  to be NULL
     err = rbus_unsubscribeFromEvent(obj_name, NULL);
     ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_GENERAL) << "rbus_unsubscribeFromEvent failed";
