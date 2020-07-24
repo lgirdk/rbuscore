@@ -26,6 +26,10 @@ find_package(GTest QUIET)
 if (NOT GTEST_INCLUDE_DIR)
     message("Warning! GTest wasn't found. Unit test capabilities won't be built.")
 else ()
+    if (BUILD_FOR_DESKTOP)
+        add_compile_options(-D BUILD_FOR_DESKTOP)
+    endif ()
+
     add_executable(rbus_test_server rbus_test_util.c rbus_test_server.c)
     add_dependencies(rbus_test_server rbus-core)
     target_link_libraries(rbus_test_server rbus-core)
@@ -58,7 +62,7 @@ else ()
         COMMAND rbus_unit_test_app
     )
 
-    install (TARGETS rbus_test_server rbus_unit_test_app
+    install (TARGETS rbus_event_server rbus_test_server rbus_unit_test_app
             RUNTIME DESTINATION bin)
 endif ()
 endif (BUILD_RBUS_UNIT_TEST)

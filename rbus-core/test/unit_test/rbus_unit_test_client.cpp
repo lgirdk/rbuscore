@@ -41,7 +41,11 @@ typedef struct
 
 
 char server_kill[] = "pkill -9 -f rbus_test_server";
+#ifdef BUILD_FOR_DESKTOP
 char server_create[] = "./rbus_test_server alpha > /tmp/ll.txt  2>&1 &";
+#else
+char server_create[] = "/usr/bin/rbus_test_server alpha > /tmp/ll.txt  2>&1 &";
+#endif
 
 class TestClient : public ::testing::Test{
 
