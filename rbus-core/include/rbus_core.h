@@ -38,7 +38,7 @@ typedef int (*rbus_callback_t)(const char * destination, const char * method, rt
 typedef int (*rbus_async_callback_t)(rtMessage message, void * user_data);
 typedef int (*rbus_event_callback_t)(const char * object_name,  const char * event_name, rtMessage message, void * user_data);
 typedef int (*rbus_timed_update_event_callback_t)(rtMessage *message);
-typedef int (*rbus_event_subscribe_callback_t)(const char * object_name,  const char * event_name, const char * listener, int added, void * user_data);
+typedef int (*rbus_event_subscribe_callback_t)(const char * object_name,  const char * event_name, const char * listener, int added, const rtMessage filter, void * user_data);
 
 typedef struct
 {
@@ -127,7 +127,7 @@ rbus_error_t rbus_registerTimedUpdateEventCallback(const char* object_name,  con
 
 /* Subscribe to 'event_name' events from 'object_name' object. If the object supports only one event, event_name can be NULL. If the event_name is an alias for the object, then object_name can be NULL. The installed callback will be invoked every time 
  * a matching event is received. */
-rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event_name, rbus_event_callback_t callback, void * user_data);
+rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rtMessage filter, void * user_data);
 
 /* Unsubscribe from receiving 'event_name' events from 'object_name' object. If the object supports only one event, event_name can be NULL. */
 rbus_error_t rbus_unsubscribeFromEvent(const char * object_name,  const char * event_name);

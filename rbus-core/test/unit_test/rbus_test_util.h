@@ -68,7 +68,7 @@ int handle_setAttributes2(const char * destination, const char * method, rtMessa
 int handle_timeout(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
 void handle_unknown(const char * destination, const char * method, rtMessage request, rtMessage *response, const rtMessageHeader* hdr);
 int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr);
-int sub1_callback(const char * object,  const char * event, const char * listener, int added, void* data);
+int sub1_callback(const char * object,  const char * event, const char * listener, int added, const rtMessage filter, void* data);
 
 #ifdef __cplusplus
 }

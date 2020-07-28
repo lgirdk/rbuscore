@@ -388,7 +388,7 @@ int callback(const char * destination, const char * method, rtMessage message, v
     return 0;
 }
 
-int sub1_callback(const char * object,  const char * event, const char * listener, int added, void* data)
+int sub1_callback(const char * object,  const char * event, const char * listener, int added, const rtMessage filter, void* data)
 {
     printf("Received sub_callback object=%s event=%s listerner=%s added=%d data=%p\n", object, event, listener, added, data);
     return 0;

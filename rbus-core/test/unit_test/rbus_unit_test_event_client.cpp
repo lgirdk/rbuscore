@@ -157,20 +157,20 @@ TEST_F(EventClientAPIs, rbus_subscribeToEvent_test1)
     conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
     ASSERT_EQ(conn_status, true) << "RBUS_OPEN_BROKER_CONNECTION failed";
     //Test with invalid objname passed
-     err = rbus_subscribeToEvent(NULL, "event_1", &event_callback, NULL);
+     err = rbus_subscribeToEvent(NULL, "event_1", &event_callback, NULL, NULL);
      ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_REMOTE_END_FAILED_TO_RESPOND) << "rbus_subscribeToEvent failed";
     //Test with the event name  to be NULL
-     err = rbus_subscribeToEvent(obj_name, "NULL", &event_callback, NULL);
+     err = rbus_subscribeToEvent(obj_name, "NULL", &event_callback, NULL, NULL);
      ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_GENERAL) << "rbus_subscribeToEvent failed";
     //Test with the callback to be NULL
-     err = rbus_subscribeToEvent(obj_name, "event_1",NULL, NULL);
+     err = rbus_subscribeToEvent(obj_name, "event_1",NULL, NULL, NULL);
      ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_INVALID_PARAM) << "rbus_subscribeToEvent failed";
     //Test with the valid Event name, objname, Callback
-     err = rbus_subscribeToEvent(obj_name, "event_1",&event_callback, NULL);
+     err = rbus_subscribeToEvent(obj_name, "event_1",&event_callback, NULL, NULL);
      ASSERT_EQ(err,RTMESSAGE_BUS_SUCCESS) << "rbus_subscribeToEvent failed";
      printf("Subscribed Events with Event name: event_1 \n");
     //Test with the already subscribed Event
-     err = rbus_subscribeToEvent(obj_name, "event_1",&event_callback, NULL);
+     err = rbus_subscribeToEvent(obj_name, "event_1",&event_callback, NULL, NULL);
      ASSERT_EQ(err,RTMESSAGE_BUS_SUCCESS) << "rbus_subscribeToEvent failed";
     conn_status = CALL_RBUS_CLOSE_BROKER_CONNECTION();
     ASSERT_EQ(conn_status, true) << "RBUS_CLOSE_BROKER_CONNECTION failed";
@@ -187,7 +187,7 @@ TEST_F(EventClientAPIs, rbus_subscribeToEvent_test2)
     ASSERT_EQ(conn_status, true) << "RBUS_OPEN_BROKER_CONNECTION failed";
     //Boundary Test with MAX_OBJECT_NAME_LENGTH
     memset(obj_name, 't', (sizeof(obj_name)- 1));
-    err = rbus_subscribeToEvent(obj_name, "event_1",&event_callback, NULL);
+    err = rbus_subscribeToEvent(obj_name, "event_1",&event_callback, NULL, NULL);
     ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_INVALID_PARAM) << "rbus_subscribeToEvent failed";
     conn_status = CALL_RBUS_CLOSE_BROKER_CONNECTION();
     ASSERT_EQ(conn_status, true) << "RBUS_CLOSE_BROKER_CONNECTION failed";
@@ -230,7 +230,7 @@ TEST_F(EventClientAPIs, rbus_unsubscribeFromEvent_test2)
     ASSERT_EQ(conn_status, true) << "RBUS_OPEN_BROKER_CONNECTION failed";
     //Boundary Test with MAX_OBJECT_NAME_LENGTH
     memset(obj_name, 't', (sizeof(obj_name)- 1));
-    err = rbus_subscribeToEvent(obj_name, "event_1",&event_callback, NULL);
+    err = rbus_subscribeToEvent(obj_name, "event_1",&event_callback, NULL, NULL);
     ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_INVALID_PARAM) << "rbus_subscribeToEvent failed";
     conn_status = CALL_RBUS_CLOSE_BROKER_CONNECTION();
     ASSERT_EQ(conn_status, true) << "RBUS_CLOSE_BROKER_CONNECTION failed";
@@ -247,7 +247,7 @@ TEST_F(EventClientAPIs, Data_eventPushPull_test1)
    conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
     ASSERT_EQ(conn_status, true) << "RBUS_OPEN_BROKER_CONNECTION failed";
     //Test with the valid Event name, objname, Callback
-    err = rbus_subscribeToEvent(obj_name, "event_1",&event_callback, NULL);
+    err = rbus_subscribeToEvent(obj_name, "event_1",&event_callback, NULL, NULL);
     ASSERT_EQ(err,RTMESSAGE_BUS_SUCCESS) << "rbus_subscribeToEvent failed";
     printf("Subscribed Events with Event name: event_1 \n");
     CALL_RBUS_PULL_OBJECT(test_string,obj_name);
