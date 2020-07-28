@@ -75,6 +75,8 @@ typedef enum _rbuscore_bus_status
 #define MESSAGE_FIELD_METHOD "_method"
 #define MESSAGE_FIELD_EVENT_NAME "_event"
 #define MESSAGE_FIELD_EVENT_SENDER "_esender"
+#define MESSAGE_FIELD_EVENT_HAS_FILTER "_ehasfilter"
+#define MESSAGE_FIELD_EVENT_FILTER "_efilter"
 /*End message fields. */
 
 #define stringify(s) _stringify(s)
