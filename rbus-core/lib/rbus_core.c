@@ -1618,6 +1618,10 @@ rbus_error_t unsubscribeOnevent(const char * path);
 
 rbuscore_bus_status_t rbuscore_checkBusStatus(void)
 {
+#ifdef RBUS_ALWAYS_ON
+    rtLog_Info ("RBus Enabled");
+    return RBUSCORE_ENABLED;
+#else
     if(access("/nvram/rbus_support", F_OK) == 0)
     {
         rtLog_Info ("Currently RBus Enabled");
@@ -1638,4 +1642,5 @@ rbuscore_bus_status_t rbuscore_checkBusStatus(void)
         rtLog_Info ("Currently RBus Disabled");
         return RBUSCORE_DISABLED;
     }
+#endif /* RBUS_ALWAYS_ON */
 }
