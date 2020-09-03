@@ -40,7 +40,7 @@ typedef struct
 }test_struct_t;
 
 
-char server_kill[] = "pkill -9 -f rbus_test_server";
+char server_kill[] = "killall -9 rbus_test_server";
 #ifdef BUILD_FOR_DESKTOP
 char server_create[] = "./rbus_test_server alpha > /tmp/ll.txt  2>&1 &";
 #else

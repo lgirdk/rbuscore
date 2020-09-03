@@ -198,8 +198,10 @@ TEST_F(MultipleServerTest, rbus_multipleServer_test1)
     char data_buf[100];
     int server_count = 3;
     int object_count = 3;
+    int reg_object_count = 0;
     pid_t pid[10];
     bool is_parent = true;
+    const char *pFound = NULL;
 
     for(j = 0; j < server_count; j++)
     {
@@ -226,14 +228,19 @@ TEST_F(MultipleServerTest, rbus_multipleServer_test1)
         if(RTMESSAGE_BUS_SUCCESS == err)
         {
             rbus_GetInt32(components, REGISTERED_COMPONENTS_SIZE, &num_objects);
-            EXPECT_EQ(num_objects, (server_count * object_count)) << "rbus_registeredComponent returned wrong size";
             for(int i = 0; i < num_objects; i++)
             {
                 const char * ptr;
                 rbus_GetString(components, REGISTERED_COMPONENTS_ENTRIES, &ptr);
+                pFound=strstr(ptr,"test_server_");
+                if(pFound) {
+                    if(strstr(pFound,"_student_info.obj"))
+                        reg_object_count++;
+                }
                 object_list.emplace_back(std::string(ptr));
             }
             rtMessage_Release(components);
+            EXPECT_EQ(reg_object_count, (server_count * object_count)) << "rbus_registeredComponent returned wrong size";
         }
         
         for(j = 1; j <= server_count; j++)

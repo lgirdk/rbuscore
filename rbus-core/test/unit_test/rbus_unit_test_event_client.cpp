@@ -43,7 +43,7 @@ typedef struct
 }test_struct_t;
 
 
-char eventserver_kill[] = "pkill -9 -f rbus_event_server";
+char eventserver_kill[] = "killall -9 rbus_event_server";
 #ifdef BUILD_FOR_DESKTOP
 char eventserver_create[] = "./rbus_event_server alpha > /tmp/outp.txt  2>&1 &";
 #else
