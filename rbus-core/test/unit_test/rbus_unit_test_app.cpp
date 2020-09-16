@@ -34,8 +34,8 @@ extern "C" {
 #include "gtest_app.h"
 
 
-#define DEFAULT_RESULT_FILEPATH "/tmp/"
-#define DEFAULT_RESULT_FILENAME "rbus_unit_test_details.xml"
+#define DEFAULT_RESULT_FILEPATH "/tmp/Gtest_Report/"
+#define DEFAULT_RESULT_FILENAME "rbus_gtest_report.xml"
 #define DEFAULT_RESULT_BUFFERSIZE 128
 
 GTEST_API_ int main(int argc, char *argv[])
