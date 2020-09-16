@@ -41,7 +41,7 @@ else ()
    enable_testing()
     include_directories(${GTEST_INCLUDE_DIR})
 
-    add_executable(rbus_unit_test_app
+    add_executable(rbus_gtest.bin
                    rbus_unit_test_marshalling.cpp
                    rbus_test_util.c
                    rbus_unit_test_client.cpp
@@ -53,16 +53,16 @@ else ()
                    rbus_unit_test_app.cpp
                    rbus_unit_test_event_client.cpp
                    rbus_unit_test_event_server.cpp)
-    add_dependencies(rbus_unit_test_app rbus-core)
-    target_link_libraries(rbus_unit_test_app rbus-core
+    add_dependencies(rbus_gtest.bin rbus-core)
+    target_link_libraries(rbus_gtest.bin rbus-core
                                            gtest)
 
     add_test(
-        NAME rbus_unit_test_app
-        COMMAND rbus_unit_test_app
+        NAME rbus_gtest.bin
+        COMMAND rbus_gtest.bin
     )
 
-    install (TARGETS rbus_event_server rbus_test_server rbus_unit_test_app
+    install (TARGETS rbus_event_server rbus_test_server rbus_gtest.bin
             RUNTIME DESTINATION bin)
 endif ()
 endif (BUILD_RBUS_UNIT_TEST)
