@@ -308,7 +308,7 @@ static rbus_error_t send_subscription_request(const char * object_name, const ch
 
 static void perform_init()
 {
-	rtLog_Info("Performing init");
+	rtLog_Debug("Performing init");
 
 	pthread_mutexattr_t attr;
 	pthread_mutexattr_init(&attr);
@@ -323,7 +323,7 @@ static void perform_cleanup()
 {
     size_t i, sz;
 
-    rtLog_Info("Performing cleanup");
+    rtLog_Debug("Performing cleanup");
 
     lock();
 
@@ -530,7 +530,7 @@ rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char 
 	{
 		g_server_objects[i].callback = dummyOnMessage;
 	}*/
-	rtLog_Info("Successfully created connection for %s.", component_name );
+	rtLog_Debug("Successfully created connection for %s.", component_name );
 	return ret;
 }
 
@@ -679,7 +679,7 @@ rbus_error_t rbus_registerObj(const char * object_name, rbus_callback_t handler,
         rtVector_PushBack(g_server_objects, obj);
         sz = rtVector_Size(g_server_objects);
         unlock();
-        rtLog_Info("Registered object %s", object_name);
+        rtLog_Debug("Registered object %s", object_name);
         if(sz >= MAX_REGISTERED_OBJECTS)
         {
             rtLog_Warn("Number of registered objects is %lu", sz);
@@ -725,7 +725,7 @@ rbus_error_t rbus_registerMethod(const char * object_name, const char *method_na
             {
                 server_method_create(&method, method_name, handler, user_data);
                 rtVector_PushBack(obj->methods, method);
-                rtLog_Info("Successfully registered method %s with object %s", method_name, object_name);
+                rtLog_Debug("Successfully registered method %s with object %s", method_name, object_name);
             }
         }
     }
@@ -1079,7 +1079,7 @@ static rbus_error_t install_subscription_handlers(server_object_t object)
     }
 
     /*No subscription handlers present. Add them.*/
-    rtLog_Info("Adding handler for subscription requests for %s.", object->name);
+    rtLog_Debug("Adding handler for subscription requests for %s.", object->name);
     if((ret = rbus_registerMethod(object->name, METHOD_ADD_EVENT_SUBSCRIPTION, subscription_handler, object)) != RTMESSAGE_BUS_SUCCESS)
     {
         rtLog_Error("Could not register add_subscription_handler.");
@@ -1092,7 +1092,7 @@ static rbus_error_t install_subscription_handlers(server_object_t object)
         }
         else
         {
-            rtLog_Info("Successfully registered subscription handlers for %s.", object->name);
+            rtLog_Debug("Successfully registered subscription handlers for %s.", object->name);
             object->process_event_subscriptions = true;
         }
     }
@@ -1247,12 +1247,12 @@ static rbus_error_t remove_subscription_callback(const char * object_name,  cons
         if(evt)
         {
             rtVector_RemoveItem(sub->events, evt, rtVector_Cleanup_Free);
-            rtLog_Info("Subscription removed for event %s::%s.", object_name, event_name);
+            rtLog_Debug("Subscription removed for event %s::%s.", object_name, event_name);
             ret = RTMESSAGE_BUS_SUCCESS;
 
             if(rtVector_Size(sub->events) == 0)
             {
-                rtLog_Info("Zero event subscriptions remaining for object %s. Cleaning up.", object_name);
+                rtLog_Debug("Zero event subscriptions remaining for object %s. Cleaning up.", object_name);
                 rtVector_RemoveItem(g_event_subscriptions_for_client, sub, client_subscription_destroy);
             }
         }
@@ -1325,7 +1325,7 @@ rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event
     /*create event and add to sub*/
     client_event_create(&evt, event_name, callback, user_data);
     rtVector_PushBack(sub->events, evt);
-    rtLog_Info("Added subscription for event %s::%s.", object_name, event_name);
+    rtLog_Debug("Added subscription for event %s::%s.", object_name, event_name);
 
     unlock();
 
