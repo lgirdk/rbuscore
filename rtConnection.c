@@ -159,11 +159,11 @@ rtConnection_ConnectAndRegister(rtConnection con)
   if (con->fd != -1)
     close(con->fd);
 
-  rtLog_Info("connecting to router");
+  rtLog_Debug("connecting to router");
   con->fd = socket(con->remote_endpoint.ss_family, SOCK_STREAM, 0);
   if (con->fd == -1)
     return rtErrorFromErrno(errno);
-  rtLog_Info("router connection up");
+  rtLog_Debug("router connection up");
 
   fdManip = fcntl(con->fd, F_GETFD);
   if (fdManip < 0)
@@ -203,7 +203,7 @@ rtConnection_ConnectAndRegister(rtConnection con)
 
     rtSocketStorage_ToString(&con->local_endpoint, local_addr, sizeof(local_addr), &local_port);
     rtSocketStorage_ToString(&con->remote_endpoint, remote_addr, sizeof(remote_addr), &remote_port);
-    rtLog_Info("connect %s:%d -> %s:%d", local_addr, local_port, remote_addr, remote_port);
+    rtLog_Debug("connect %s:%d -> %s:%d", local_addr, local_port, remote_addr, remote_port);
   }
 
   for (i = 0; i < RTMSG_LISTENERS_MAX; ++i)
@@ -1122,7 +1122,7 @@ rtConnection_Read(rtConnection con, int32_t timeout)
 static void * rtConnection_CallbackThread(void *data)
 {
   rtConnection con = (rtConnection)data;
-  rtLog_Info("Callback thread started");
+  rtLog_Debug("Callback thread started");
   while(1 == con->run_threads)
   {
     size_t size;
@@ -1211,7 +1211,7 @@ static void * rtConnection_CallbackThread(void *data)
       pthread_mutex_unlock(&con->callback_message_mutex);
     }
   }
-  rtLog_Info("Callback thread exiting");
+  rtLog_Debug("Callback thread exiting");
   return NULL;
 }
 
@@ -1220,7 +1220,7 @@ static void * rtConnection_ReaderThread(void *data)
   rtError err = RT_OK;
   rtConnection con = (rtConnection)data;
   g_read_tid = syscall(__NR_gettid);
-  rtLog_Info("Reader thread started");
+  rtLog_Debug("Reader thread started");
   while(1 == con->run_threads)
   {
     if((err = rtConnection_Read(con, -1)) != RT_OK)
@@ -1237,7 +1237,7 @@ static void * rtConnection_ReaderThread(void *data)
       sleep(5); //Avoid tight loops if we have an unrecoverable situation.
     }
   }
-  rtLog_Info("Reader thread exiting");
+  rtLog_Debug("Reader thread exiting");
   return NULL;
 }
 
