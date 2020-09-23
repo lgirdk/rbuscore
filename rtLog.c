@@ -216,6 +216,9 @@ void rtLogPrintf(rtLogLevel level, const char* file, int line, const char* forma
 
   if (NULL != sLogHandler)
   {
+    if (level < sLevel)
+      return;
+
     sLogHandler(level, path, line, threadId, buff);
   }
 #ifdef ENABLE_RDKLOGGER
