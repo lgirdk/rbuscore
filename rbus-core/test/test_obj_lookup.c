@@ -26,12 +26,13 @@
 #include "rtLog.h"
 
 static char data[100] = "init init init";
-static int handle_get(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response)
+static int handle_get(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) message;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
     rbus_SetString(*response, MESSAGE_FIELD_PAYLOAD, data);
@@ -39,20 +40,22 @@ static int handle_get(const char * destination, const char * method, rtMessage m
     return 0;
 }
 
-static void handle_unknown(const char * destination, const char * method, rtMessage message, rtMessage *response)
+static void handle_unknown(const char * destination, const char * method, rtMessage message, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) message;
     (void) destination;
     (void) method;
+    (void) hdr;
     rtMessage_Create(response);
     rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_ERROR_UNSUPPORTED_METHOD);
 }
 
-static int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response)
+static int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) destination;
     (void) method;
+    (void) hdr;
     printf("Received message in base callback.\n");
     char* buff = NULL;
     uint32_t buff_length = 0;
@@ -62,7 +65,7 @@ static int callback(const char * destination, const char * method, rtMessage mes
     free(buff);
 
     /* Craft response message.*/
-    handle_unknown(destination, method, message, response);
+    handle_unknown(destination, method, message, response, hdr);
     return 0;
 }
 
