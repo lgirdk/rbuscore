@@ -498,8 +498,10 @@ rtConnection_SendResponse(rtConnection con, rtMessageHeader const* request_hdr, 
   rtError err;
 
   rtMessage_ToByteArrayWithSize(res, &p, DEFAULT_SEND_BUFFER_SIZE, &n);
+  pthread_mutex_lock(&con->mutex);
   err = rtConnection_SendInternal(con, request_hdr->reply_topic, p, n, request_hdr->topic, rtMessageFlags_Response,
           request_hdr->sequence_number);
+  pthread_mutex_unlock(&con->mutex);
   (void) timeout;
 
   return err;
