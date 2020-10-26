@@ -21,7 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 #include "bin_header.h"
 #include "rtLog.h"
 
@@ -56,15 +56,15 @@ int main(int argc, char *argv[])
     snprintf(buffer, (sizeof(buffer) - 1), "%s", argv[1]);
 
     /*Pull the object from remote end.*/
-    rtMessage response;
+    rbusMessage response;
     if((err = rbus_pullObj(argv[2], 1000, &response)) == RTMESSAGE_BUS_SUCCESS)
     {
         printf("Received object %s\n", argv[2]);
         const binstruct_t * ptr;
         unsigned int size = 0;
-        rtMessage_GetBinaryData(response, MESSAGE_FIELD_PAYLOAD, (const void **)&ptr, &size);
+        rbusMessage_GetBytes(response, (const uint8_t **)&ptr, &size);
         printf("Payload: %d %d %d %s %d\n", ptr->a, ptr->b, ptr->c, ptr->name, ptr->d);
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
     {
@@ -72,9 +72,9 @@ int main(int argc, char *argv[])
     }
 
     /* Push the object to remote end.*/
-    rtMessage setter;
-    rtMessage_Create(&setter);
-    rbus_AddBinaryData(setter, MESSAGE_FIELD_PAYLOAD, (void *)&mystruct, sizeof(mystruct));
+    rbusMessage setter;
+    rbusMessage_Init(&setter);
+    rbusMessage_SetBytes(setter, (void *)&mystruct, sizeof(mystruct));
     if((err = rbus_pushObj(argv[2], setter, 1000)) == RTMESSAGE_BUS_SUCCESS)
     {
         printf("Push object %s\n", argv[2]);
@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
     {
         printf("Could not push object %s. Error: 0x%x\n", argv[2], err);
     }
-    rtMessage_Release(setter);
+    rbusMessage_Release(setter);
 
     /* Pull again to make sure that "set" worked. */
     if((err = rbus_pullObj(argv[2], 1000, &response)) == RTMESSAGE_BUS_SUCCESS)
@@ -91,9 +91,9 @@ int main(int argc, char *argv[])
         printf("Received object %s\n", argv[2]);
         const binstruct_t * ptr;
         unsigned int size = 0;
-        rbus_GetBinaryData(response, MESSAGE_FIELD_PAYLOAD, (const void **)&ptr, &size);
+        rbusMessage_GetBytes(response, (const uint8_t **)&ptr, &size);
         printf("Payload: %d %d %d %s %d\n", ptr->a, ptr->b, ptr->c, ptr->name, ptr->d);
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
     {

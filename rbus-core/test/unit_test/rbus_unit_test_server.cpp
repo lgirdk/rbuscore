@@ -699,21 +699,21 @@ TEST_F(TestServer, rbus_registerMethod_test8)
 
     /*Method name - 61 char + null termination*/
     memset(method_name1, 'n', (sizeof(method_name1)- 1));
-    printf("Registering method %s strlen : %d \n", method_name1, strlen(method_name1));
+    printf("Registering method %s strlen : %lu \n", method_name1, strlen(method_name1));
 
     err = rbus_registerMethod(obj_name, method_name1, handle_set1, NULL);
     EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_registerMethod failed";
 
     /*Method name - 64char + null termination*/
     memset(method_name2, 'o', (sizeof(method_name2)- 2));
-    printf("Registering method %s strlen : %d\n", method_name2, strlen(method_name2));
+    printf("Registering method %s strlen : %lu\n", method_name2, strlen(method_name2));
 
     err = rbus_registerMethod(obj_name, method_name2, handle_get1, NULL);
     EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_PARAM) << "rbus_registerMethod failed";
 
     /*Method name - 65char + null termination*/
     memset(method_name2, 'o', (sizeof(method_name2)- 1));
-    printf("Registering method %s : strlen : %d\n", method_name2, strlen(method_name2));
+    printf("Registering method %s : strlen : %lu\n", method_name2, strlen(method_name2));
 
     err = rbus_registerMethod(obj_name, method_name2, handle_get1, NULL);
     EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_PARAM) << "rbus_registerMethod failed";

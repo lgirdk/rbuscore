@@ -21,61 +21,60 @@
 #include <unistd.h>
 #include <string.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
 #include "rtLog.h"
 #include "rbus_session_mgr.h"
 
 static int g_counter;
 static int g_current_session_id;
 
-static int request_session_id(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int request_session_id(const char * destination, const char * method, rbusMessage request, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) user_data;
     (void) destination;
     (void) method;
     (void) hdr;
-    rtMessage_Create(response);
+    rbusMessage_Init(response);
     if(0 == g_current_session_id)
     {
         g_current_session_id = ++g_counter;
         printf("Creating new session %d\n", g_current_session_id);
-        rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
-        rbus_SetInt32(*response, MESSAGE_FIELD_PAYLOAD, g_current_session_id);
+        rbusMessage_SetInt32(*response, RTMESSAGE_BUS_SUCCESS);
+        rbusMessage_SetInt32(*response, g_current_session_id);
     }
     else
     {
         printf("Cannot create new session when session %d is active.\n", g_current_session_id);
-        rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_ERROR_INVALID_STATE);
+        rbusMessage_SetInt32(*response, RTMESSAGE_BUS_ERROR_INVALID_STATE);
     }
     return 0;
 }
 
-static int get_session_id(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int get_session_id(const char * destination, const char * method, rbusMessage request, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) user_data;
     (void) destination;
     (void) method;
     (void) hdr;
-    rtMessage_Create(response);
+    rbusMessage_Init(response);
     printf("Current session id is %d\n", g_current_session_id);
-    rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
-    rbus_SetInt32(*response, MESSAGE_FIELD_PAYLOAD, g_current_session_id);
+    rbusMessage_SetInt32(*response, RTMESSAGE_BUS_SUCCESS);
+    rbusMessage_SetInt32(*response, g_current_session_id);
     return 0;
 }
 
-static int end_session(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int end_session(const char * destination, const char * method, rbusMessage request, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) destination;
     (void) method;
     (void) hdr;
-    rtMessage_Create(response);
+    rbusMessage_Init(response);
     int sessionid = 0;
     rbus_error_t result = RTMESSAGE_BUS_SUCCESS;
 
-    if(RT_OK == rbus_GetInt32(request, MESSAGE_FIELD_PAYLOAD, &sessionid))
+    if(RT_OK == rbusMessage_GetInt32(request, &sessionid))
     {
         if(sessionid == g_current_session_id)
         {
@@ -94,12 +93,12 @@ static int end_session(const char * destination, const char * method, rtMessage 
         printf("Session id not found. Cannot process end of session.\n");
         result = RTMESSAGE_BUS_ERROR_INVALID_PARAM;
     }
-    rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, result);
+    rbusMessage_SetInt32(*response, result);
     return 0;
 }
 
 
-static int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int callback(const char * destination, const char * method, rbusMessage message, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) response;
@@ -110,7 +109,7 @@ static int callback(const char * destination, const char * method, rtMessage mes
     char* buff = NULL;
     uint32_t buff_length = 0;
 
-    rtMessage_ToString(message, &buff, &buff_length);
+    rbusMessage_ToDebugString(message, &buff, &buff_length);
     printf("%s\n", buff);
     free(buff);
 

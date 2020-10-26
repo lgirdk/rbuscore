@@ -20,16 +20,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 #include "rtLog.h"
 
 
-static void dumpMessage(rtMessage message)
+static void dumpMessage(rbusMessage message)
 {
     char* buff = NULL;
     uint32_t buff_length = 0;
 
-    rtMessage_ToString(message, &buff, &buff_length);
+    rbusMessage_ToDebugString(message, &buff, &buff_length);
     printf("dumpMessage: %.*s\n", buff_length, buff);
     free(buff);
 }
@@ -37,12 +37,12 @@ static void dumpMessage(rtMessage message)
 static void pullAndDumpObject(const char * object)
 {
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    rtMessage response;
+    rbusMessage response;
     if((err = rbus_pullObj(object, 1000, &response)) == RTMESSAGE_BUS_SUCCESS)
     {
         printf("Received object %s\n", object);
         dumpMessage(response);
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
         printf("Could not pull object %s\n", object);
@@ -51,19 +51,18 @@ static void pullAndDumpObject(const char * object)
 
 static void queryWildcardExpression(const char * expression)
 {
-    rtMessage response;
+    char** dests;
     int num_entries = 0;
-    const char *entry;
     
-    if(RTMESSAGE_BUS_SUCCESS == rbus_resolveWildcardDestination(expression, &num_entries, &response))
+    if(RTMESSAGE_BUS_SUCCESS == rbus_discoverWildcardDestinations(expression, &num_entries, &dests))
     {
         printf("Query for expression %s was successful. See result below:\n", expression);
         for(int i = 0; i < num_entries; i++)
         {
-            rbus_PopString(response, &entry);
-            printf("Destination %d is %s\n", i, entry);
+            printf("Destination %d is %s\n", i, dests[i]);
+            free(dests[i]);
         }
-        rtMessage_Release(response);
+        free(dests);
     }
     else
         printf("Query for expression %s was not successful.\n", expression);

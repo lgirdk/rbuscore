@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 #include "rtLog.h"
 
 #define OBJ1_NAME "foo"
@@ -28,12 +28,12 @@
 static char buffer[100];
 
 
-static void dumpMessage(rtMessage message)
+static void dumpMessage(rbusMessage message)
 {
     char* buff = NULL;
     uint32_t buff_length = 0;
 
-    rtMessage_ToString(message, &buff, &buff_length);
+    rbusMessage_ToDebugString(message, &buff, &buff_length);
     printf("dumpMessage: %.*s\n", buff_length, buff);
     free(buff);
 }
@@ -51,13 +51,13 @@ int main(int argc, char *argv[])
 
 
     /*Pull the object from remote end.*/
-    rtMessage response;
+    rbusMessage response;
     if((err = rbus_pullObj(argv[1], 1000, &response)) == RTMESSAGE_BUS_SUCCESS)
     {
         const char* buff = NULL;
         printf("Received object %s\n", argv[1]);
         dumpMessage(response);
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
     {

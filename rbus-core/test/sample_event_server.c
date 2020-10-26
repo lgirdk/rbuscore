@@ -21,40 +21,40 @@
 #include <unistd.h>
 #include <string.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 #include "rtLog.h"
 
 static char data1[100] = "obj1 init init init";
 static char data2[100] = "obj2 init init init";
 
-static int handle_get(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int handle_get(const char * destination, const char * method, rbusMessage request, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) hdr;
-    rtMessage_Create(response);
+    rbusMessage_Init(response);
     printf("%s::%s %s, ptr %p\n", destination, method, (const char *)user_data, user_data);
-    rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
-    rbus_SetString(*response, MESSAGE_FIELD_PAYLOAD, (const char *)user_data);
+    rbusMessage_SetInt32(*response, RTMESSAGE_BUS_SUCCESS);
+    rbusMessage_SetString(*response, (const char *)user_data);
     return 0;
 }
 
-static int handle_set(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int handle_set(const char * destination, const char * method, rbusMessage request, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) hdr;
     rtError err = RT_OK;
     const char * payload = NULL;
     printf("calling set %s\n", (const char *)user_data);
     printf("%s::%s %s, \n", destination, method, (const char *)user_data);
-    if((err = rbus_GetString(request, MESSAGE_FIELD_PAYLOAD, &payload) == RT_OK)) //TODO: Should payload be freed?
+    if((err = rbusMessage_GetString(request, &payload) == RT_OK)) //TODO: Should payload be freed?
     {
         strncpy((char *)user_data, payload, sizeof(data1));
     }
-    rtMessage_Create(response);
-    rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
+    rbusMessage_Init(response);
+    rbusMessage_SetInt32(*response, RTMESSAGE_BUS_SUCCESS);
     return 0;
 }
 
-static int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int callback(const char * destination, const char * method, rbusMessage message, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) response;
@@ -65,13 +65,13 @@ static int callback(const char * destination, const char * method, rtMessage mes
     char* buff = NULL;
     uint32_t buff_length = 0;
 
-    rtMessage_ToString(message, &buff, &buff_length);
+    rbusMessage_ToDebugString(message, &buff, &buff_length);
     printf("%s\n", buff);
     free(buff);
     return 0;
 }
 
-static int sub_callback(const char * object,  const char * event, const char * listener, int added, const rtMessage filter, void* data)
+static int sub_callback(const char * object,  const char * event, const char * listener, int added, const rbusMessage filter, void* data)
 {
     (void)filter;
     printf("Received sub_callback object=%s event=%s listerner=%s added=%d data=%p\n", object, event, listener, added, data);
@@ -123,38 +123,38 @@ int main(int argc, char *argv[])
 
     {
         //Run some negative test cases first.
-        rtMessage msg3;
-        rtMessage_Create(&msg3);
-        rbus_SetString(msg3, "abcd", "efgh");
+        rbusMessage msg3;
+        rbusMessage_Init(&msg3);
+        rbusMessage_SetString(msg3, "efgh");
         rbus_publishEvent(OBJ2_NAME, "non_event", msg3);
         rbus_publishEvent("non_object", "event3", msg3);
-        rtMessage_Release(msg3);
+        rbusMessage_Release(msg3);
     }
 
     int i = 0;
     for(;;)
     {
-        rtMessage msg1, msg2, msg4;
-        rtMessage_Create(&msg1);
-        rtMessage_Create(&msg2);
-        rtMessage_Create(&msg4);
-        rbus_SetString(msg1, "foo", "bar");
-        rbus_SetString(msg2, "dead", "beef");
-        rbus_SetString(msg4, "one", "two");
+        rbusMessage msg1, msg2, msg4;
+        rbusMessage_Init(&msg1);
+        rbusMessage_Init(&msg2);
+        rbusMessage_Init(&msg4);
+        rbusMessage_SetString(msg1, "bar");
+        rbusMessage_SetString(msg2, "beef");
+        rbusMessage_SetString(msg4, "two");
         rbus_publishEvent(OBJ1_NAME, "event1", msg1);
         rbus_publishEvent(OBJ1_NAME, "event2", msg2);
         rbus_publishEvent(OBJ1_NAME, "event4", msg4);
-        rtMessage_Release(msg1);
-        rtMessage_Release(msg2);
-        rtMessage_Release(msg4);
+        rbusMessage_Release(msg1);
+        rbusMessage_Release(msg2);
+        rbusMessage_Release(msg4);
         i++; 
         if(i < 10)
         {
-            rtMessage msg3;
-            rtMessage_Create(&msg3);
-            rbus_SetString(msg3, "abcd", "efgh");
+            rbusMessage msg3;
+            rbusMessage_Init(&msg3);
+            rbusMessage_SetString(msg3, "efgh");
             rbus_publishEvent(OBJ2_NAME, NULL, msg3);
-            rtMessage_Release(msg3);
+            rbusMessage_Release(msg3);
         }
         if(10 == i)
         {

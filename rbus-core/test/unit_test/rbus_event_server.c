@@ -8,7 +8,7 @@ Test server for unit test client testing
 #include <string.h>
 #include <stdbool.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 #include "rbus_test_util.h"
 
 static char buffer[100];
@@ -51,14 +51,14 @@ int main(int argc, char *argv[])
     char data1[] = "data1";
     rbus_registerEvent(buffer,"event_1",sub1_callback, data1);
 
-    rtMessage msg1;
-    rtMessage_Create(&msg1);
+    rbusMessage msg1;
+    rbusMessage_Init(&msg1);
 
-    rbus_SetString(msg1, "foo", "bar");
+    rbusMessage_SetString(msg1, "bar");
 
     rbus_publishEvent(buffer, "event_1", msg1);
 
-    rtMessage_Release(msg1);
+    rbusMessage_Release(msg1);
 
   //  sleep(4);
 

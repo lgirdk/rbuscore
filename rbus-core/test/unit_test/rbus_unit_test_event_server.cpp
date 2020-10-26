@@ -26,7 +26,7 @@ Test Case : Testing rbus Event Register APIs, Publish Events creation APIs
 #include <signal.h>
 extern "C" {
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 }
 #include "gtest_app.h"
 #include "rbus_test_util.h"
@@ -146,7 +146,6 @@ TEST_F(EventServerAPIs, rbus_registerEvent_test1)
     int counter = 1;
     bool conn_status = false;
     char obj_name[20] = "test_server_1.obj1";
-    char obj_name1[20] = "test_server_1.obj2";
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
     char data[] = "data";
     CREATE_RBUS_SERVER(counter);
@@ -210,17 +209,17 @@ TEST_F(EventServerAPIs, rbus_publishEvent_test1)
     bool conn_status = false;
     char obj_name[20] = "test_server_3.obj1";
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    rtMessage msg1;
+    rbusMessage msg1;
     char data[] = "data";
     CREATE_RBUS_SERVER(counter);
 
     //Test with valid Event Name
     err = rbus_registerEvent(obj_name,"event3",sub1_callback,data);
     EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_registerEvent failed";
-    rtMessage_Create(&msg1);
-    rbus_SetString(msg1, "foo", "bar");
+    rbusMessage_Init(&msg1);
+    rbusMessage_SetString(msg1, "bar");
     rbus_publishEvent(obj_name, "event1", msg1);
-    rtMessage_Release(msg1);
+    rbusMessage_Release(msg1);
     conn_status = RBUS_CLOSE_BROKER_CONNECTION(RTMESSAGE_BUS_SUCCESS);
     ASSERT_EQ(conn_status, true) << "RBUS_OPEN_BROKER_CONNECTION failed";
 
@@ -235,7 +234,7 @@ TEST_F(EventServerAPIs, rbus_publishEvent_test2)
     bool conn_status = false;
     char obj_name[129] = "0";
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    rtMessage msg1;
+    rbusMessage msg1;
     char data[] = "data";
 
     CREATE_RBUS_SERVER(counter);
@@ -244,11 +243,11 @@ TEST_F(EventServerAPIs, rbus_publishEvent_test2)
     memset(obj_name, 't', (sizeof(obj_name)- 1));
     err = rbus_registerEvent(obj_name,"event3",sub1_callback,data);
     EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_PARAM) << "rbus_registerEvent failed";
-    rtMessage_Create(&msg1);
-    rbus_SetString(msg1, "foo", "bar");
+    rbusMessage_Init(&msg1);
+    rbusMessage_SetString(msg1, "bar");
     rbus_publishEvent(obj_name, "event1", msg1);
     EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_PARAM) << "rbus_registerEvent failed";
-    rtMessage_Release(msg1);
+    rbusMessage_Release(msg1);
 
     conn_status = RBUS_CLOSE_BROKER_CONNECTION(RTMESSAGE_BUS_SUCCESS);
     ASSERT_EQ(conn_status, true) << "RBUS_OPEN_BROKER_CONNECTION failed";
