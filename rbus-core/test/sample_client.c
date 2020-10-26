@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 #include "rtLog.h"
 
 static char buffer[100];
@@ -39,14 +39,14 @@ int main(int argc, char *argv[])
 
     snprintf(buffer, (sizeof(buffer) - 1), "%s.obj1", argv[1]);
     /*Pull the object from remote end.*/
-    rtMessage response;
+    rbusMessage response;
     if((err = rbus_pullObj(argv[2], 1000, &response)) == RTMESSAGE_BUS_SUCCESS)
     {
         const char* buff = NULL;
         printf("Received object %s\n", argv[2]);
-        rbus_GetString(response, MESSAGE_FIELD_PAYLOAD, &buff);
+        rbusMessage_GetString(response, &buff);
         printf("Payload: %s\n", buff);
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
     {
@@ -54,9 +54,9 @@ int main(int argc, char *argv[])
     }
 
     /* Push the object to remote end.*/
-    rtMessage setter;
-    rtMessage_Create(&setter);
-    rbus_SetString(setter, MESSAGE_FIELD_PAYLOAD, "foobar");
+    rbusMessage setter;
+    rbusMessage_Init(&setter);
+    rbusMessage_SetString(setter, "foobar");
     //if((err = pushObj(setter, argv[2])) == RTMESSAGE_BUS_SUCCESS)
     if((err = rbus_pushObj(argv[2], setter, 1000)) == RTMESSAGE_BUS_SUCCESS)
     {
@@ -72,9 +72,9 @@ int main(int argc, char *argv[])
     {
         const char* buff = NULL;
         printf("Received object %s\n", argv[2]);
-        rbus_GetString(response, MESSAGE_FIELD_PAYLOAD, &buff);
+        rbusMessage_GetString(response, &buff);
         printf("Payload: %s\n", buff);
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
     {

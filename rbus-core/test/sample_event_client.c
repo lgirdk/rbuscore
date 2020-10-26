@@ -20,23 +20,23 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 #include "rtLog.h"
 
 #define OBJ1_NAME "foo"
 #define OBJ2_NAME "bar"
 
-static void dumpMessage(rtMessage message)
+static void dumpMessage(rbusMessage message)
 {
     char* buff = NULL;
     uint32_t buff_length = 0;
 
-    rtMessage_ToString(message, &buff, &buff_length);
+    rbusMessage_ToDebugString(message, &buff, &buff_length);
     printf("dumpMessage: %.*s\n", buff_length, buff);
     free(buff);
 }
 
-static int event_callback(const char * object_name,  const char * event_name, rtMessage message, void * user_data)
+static int event_callback(const char * object_name,  const char * event_name, rbusMessage message, void * user_data)
 {
     (void) user_data;
     printf("In event callback for object %s, event %s.\n", object_name, event_name);
@@ -73,14 +73,14 @@ int main(int argc, char *argv[])
     sleep(1);
 #if 1
     /*Pull the object from remote end.*/
-    rtMessage response;
+    rbusMessage response;
     if((err = rbus_pullObj(OBJ1_NAME, 1000, &response)) == RTMESSAGE_BUS_SUCCESS)
     {
         const char* buff = NULL;
         printf("Received object %s\n", OBJ1_NAME);
-        rbus_GetString(response, MESSAGE_FIELD_PAYLOAD, &buff);
+        rbusMessage_GetString(response, &buff);
         printf("Payload: %s\n", buff);
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
     {
@@ -93,9 +93,9 @@ int main(int argc, char *argv[])
     {
         const char* buff = NULL;
         printf("Received object %s\n", "obj1_alias");
-        rbus_GetString(response, MESSAGE_FIELD_PAYLOAD, &buff);
+        rbusMessage_GetString(response, &buff);
         printf("Payload: %s\n", buff);
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
     {
@@ -105,9 +105,9 @@ int main(int argc, char *argv[])
     {
         const char* buff = NULL;
         printf("Received object %s\n", "obj1_alias2");
-        rbus_GetString(response, MESSAGE_FIELD_PAYLOAD, &buff);
+        rbusMessage_GetString(response, &buff);
         printf("Payload: %s\n", buff);
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
     {
@@ -118,9 +118,9 @@ int main(int argc, char *argv[])
     {
         const char* buff = NULL;
         printf("Received object %s\n", OBJ2_NAME);
-        rbus_GetString(response, MESSAGE_FIELD_PAYLOAD, &buff);
+        rbusMessage_GetString(response, &buff);
         printf("Payload: %s\n", buff);
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
     {
@@ -128,9 +128,9 @@ int main(int argc, char *argv[])
     }
 
     /* Push the object to remote end.*/
-    rtMessage setter;
-    rtMessage_Create(&setter);
-    rbus_SetString(setter, MESSAGE_FIELD_PAYLOAD, "foobar");
+    rbusMessage setter;
+    rbusMessage_Init(&setter);
+    rbusMessage_SetString(setter, "foobar");
     if((err = rbus_pushObj(OBJ1_NAME, setter, 1000)) == RTMESSAGE_BUS_SUCCESS)
     {
         printf("Push object %s\n", OBJ1_NAME);
@@ -145,9 +145,9 @@ int main(int argc, char *argv[])
     {
         const char* buff = NULL;
         printf("Received object %s\n", OBJ1_NAME);
-        rbus_GetString(response, MESSAGE_FIELD_PAYLOAD, &buff);
+        rbusMessage_GetString(response, &buff);
         printf("Payload: %s\n", buff);
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
     {

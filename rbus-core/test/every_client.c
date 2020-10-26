@@ -20,16 +20,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 #include "rtLog.h"
 
 
-static void dumpMessage(rtMessage message)
+static void dumpMessage(rbusMessage message)
 {
     char* buff = NULL;
     uint32_t buff_length = 0;
 
-    rtMessage_ToString(message, &buff, &buff_length);
+    rbusMessage_ToDebugString(message, &buff, &buff_length);
     printf("dumpMessage: %.*s\n", buff_length, buff);
     free(buff);
 }
@@ -45,11 +45,11 @@ int main(int argc, char *argv[])
         printf("Successfully connected to bus.\n");
     }
 
-    rtMessage response;
+    rbusMessage response;
     if(RTMESSAGE_BUS_SUCCESS == rbus_invokeRemoteMethod(argv[1], METHOD_GETPARAMETERVALUES, NULL, 10000, &response))
     {
         dumpMessage(response);
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
         printf("RPC failed.\n");

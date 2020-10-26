@@ -26,7 +26,7 @@ Test Case : Testing nested rbus RPC calls
 #include <signal.h>
 extern "C" {
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 }
 #include "gtest_app.h"
 #include "rbus_test_util.h"
@@ -99,19 +99,19 @@ static void RBUS_RPC(const char *object, const char* method, const char * payloa
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
     rtError er = RT_OK;
     int rpc_result = RTMESSAGE_BUS_ERROR_GENERAL;
-    rtMessage setter, response;
-    rtMessage_Create(&setter);
+    rbusMessage setter, response;
+    rbusMessage_Init(&setter);
     if(nullptr != payload)
-        rbus_SetString(setter, MESSAGE_FIELD_PAYLOAD, payload);
+        rbusMessage_SetString(setter, payload);
     err = rbus_invokeRemoteMethod(object, method, setter, 1000, &response);
     EXPECT_EQ(err, expected_err) << "Nested RPC failed";
    
     if(RTMESSAGE_BUS_SUCCESS == err)
     {
-        er = rbus_GetInt32(response, MESSAGE_FIELD_RESULT, &rpc_result);
+        er = rbusMessage_GetInt32(response, &rpc_result);
         EXPECT_EQ(RT_OK, er) << "Nested RPC failed";
         EXPECT_EQ(RTMESSAGE_BUS_SUCCESS, rpc_result) << "Nested RPC failed";
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     return;
 }

@@ -21,26 +21,26 @@
 #include <unistd.h>
 #include <string.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 #include "rtLog.h"
 
 static char data1[100] = "wifi init init init";
 static char data2[100] = "tr69 init init init";
 
-static int handle_get(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int handle_get(const char * destination, const char * method, rbusMessage request, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) destination;
     (void) method;
     (void) request;
     (void) hdr;
-    rtMessage_Create(response);
+    rbusMessage_Init(response);
     printf("calling get %s, ptr %p\n", (const char *)user_data, user_data);
-    rbus_AppendInt32(*response,  RTMESSAGE_BUS_SUCCESS);
-    rbus_AppendString(*response,  (const char *)user_data);
+    rbusMessage_SetInt32(*response,  RTMESSAGE_BUS_SUCCESS);
+    rbusMessage_SetString(*response,  (const char *)user_data);
     return 0;
 }
 
-static int handle_set(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int handle_set(const char * destination, const char * method, rbusMessage request, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) destination;
     (void) method;
@@ -48,16 +48,16 @@ static int handle_set(const char * destination, const char * method, rtMessage r
     rtError err = RT_OK;
     const char * payload = NULL;
     printf("calling set %s\n", (const char *)user_data);
-    if((err = rbus_PopString(request,  &payload) == RT_OK)) //TODO: Should payload be freed?
+    if((err = rbusMessage_GetString(request,  &payload) == RT_OK)) //TODO: Should payload be freed?
     {
         strncpy((char *)user_data, payload, sizeof(data1));
     }
-    rtMessage_Create(response);
-    rbus_AppendInt32(*response,  RTMESSAGE_BUS_SUCCESS);
+    rbusMessage_Init(response);
+    rbusMessage_SetInt32(*response,  RTMESSAGE_BUS_SUCCESS);
     return 0;
 }
 
-static int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int callback(const char * destination, const char * method, rbusMessage message, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) destination;
     (void) method;
@@ -68,7 +68,7 @@ static int callback(const char * destination, const char * method, rtMessage mes
     char* buff = NULL;
     uint32_t buff_length = 0;
 
-    rtMessage_ToString(message, &buff, &buff_length);
+    rbusMessage_ToDebugString(message, &buff, &buff_length);
     printf("%s\n", buff);
     free(buff);
     return 0;

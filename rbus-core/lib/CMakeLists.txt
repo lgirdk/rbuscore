@@ -24,18 +24,25 @@ project(rbus-core
 include_directories(
     ../..
     ../include)
+
 add_library(
     rbus-core	
     SHARED
     rbus_core.c
-    rbus_marshalling.c)
-add_dependencies(
-    rbus-core	
-    rtMessage)
+    rbus_message.c)
+
+if (BUILD_FOR_DESKTOP)
+	add_dependencies(rbus-core msgpack)
+endif (BUILD_FOR_DESKTOP)
+
 target_link_libraries(
     rbus-core	
-    rtMessage
-    -lpthread)
+    ${RTMESSAGE_LIBRARIES}
+    ${CJSON_LIBRARIES}
+    ${RDKLOGGER_LIBRARIES}
+    -lpthread
+    -lmsgpackc)
+
 set_target_properties(rbus-core
     PROPERTIES SOVERSION "0"
     VERSION "${PROJECT_VERSION}")

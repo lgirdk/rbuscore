@@ -19,14 +19,22 @@
 cmake_minimum_required (VERSION 2.8.7)
 cmake_policy(SET CMP0048 NEW)
 
-project(rtmessage
+project(rbuscore
 	VERSION 0.1.0)
 include(ExternalProject)
 cmake_policy(SET CMP0015 NEW)
 set(CMAKE_BUILD_TYPE Debug)
 set(RDKLOGGER_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../../../rdklogger/)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
 find_package(PkgConfig REQUIRED)
+find_package(rtMessage REQUIRED)
+find_package(cjson REQUIRED)
+
+include_directories(${RTMESSAGE_INCLUDE_DIRS})
+link_directories(${RTMESSAGE_LIBRARIES})
+include_directories(${CJSON_INCLUDE_DIRS})
+link_directories(${CJSON_LIBRARIES})
 
 set(CMAKE_C_FLAGS_DEBUG "-DENABLE_ROUTER_BENCHMARKING -Wall -Wextra -g -O0 -fno-inline")
 set(CMAKE_C_FLAGS_RELEASE "-DENABLE_ROUTER_BENCHMARKING -Werror -Wall -Wextra")
@@ -44,10 +52,8 @@ else ()
 	set (CMAKE_C_STANDARD 11)
 endif ()
 
-# Below option downloads and builds Messagepack library, builds low level rtmessage libraries, its daemon and sample app, plus intermediate level bus-core API libraries and its sample apps.
 if (BUILD_FOR_DESKTOP)
 	if (ENABLE_CLANG_TIDY)
-		# Make sure clang-tidy is installed. "make run-clang-tidy" will generate the clang-tidy-output
 		find_program(GENERATOR run-clang-tidy)
 		if(NOT GENERATOR)
 			message("clang-tidy not found!")
@@ -62,31 +68,17 @@ if (BUILD_FOR_DESKTOP)
 		endif()
 	endif (ENABLE_CLANG_TIDY)
 
-	option(BUILD_RTMESSAGE_LIB "BUILD_RTMESSAGE_LIB" ON)
-	option(BUILD_RTMESSAGE_SAMPLE_APP "BUILD_RTMESSAGE_SAMPLE_APP" ON)
-	option(BUILD_RTMESSAGE_ROUTED "BUILD_RTMESSAGE_ROUTED" ON)
-	option(BUILD_RBUS "BUILD_RBUS" ON)
 	option(BUILD_RBUS_SAMPLE_APPS "BUILD_RBUS_SAMPLE_APPS" ON)
 	option(BUILD_RBUS_UNIT_TEST "BUILD_RBUS_UNIT_TEST" ON)
-	option(BUILD_RTMESSAGE_ONLY "BUILD_RTMESSAGE_ONLY" ON)
+
+    include_directories(${CMAKE_INSTALL_PREFIX}/include)
 else ()
-    option(ENABLE_RDKLOGGER "ENABLE_RDKLOGGER" ON)
+  option(ENABLE_RDKLOGGER "ENABLE_RDKLOGGER" ON)
 endif (BUILD_FOR_DESKTOP)
 
-#The below option builds only low level rtMessage APIs, plus the daemon and sample apps for those APIs.
-if (BUILD_RTMESSAGE_ONLY)
-	option(BUILD_RTMESSAGE_LIB "BUILD_RTMESSAGE_LIB" ON)
-	option(BUILD_RTMESSAGE_SAMPLE_APP "BUILD_RTMESSAGE_SAMPLE_APP" ON)
-	option(BUILD_RTMESSAGE_ROUTED "BUILD_RTMESSAGE_ROUTED" ON)
-endif (BUILD_RTMESSAGE_ONLY)
-
-# Builds intermdiate level bus-core APIs and its sample apps. Low level rtMessage library is also built in order to fulfil an internal dependency. There is a way to avoid that with a more complicated CMakeLists.txt, but keeping it simple for now. 
-if (BUILD_RBUS)
-	option(BUILD_RTMESSAGE_LIB "BUILD_RTMESSAGE_LIB" ON)
 	option(BUILD_RBUS_SAMPLE_APPS "BUILD_RBUS_SAMPLE_APPS" OFF)
 	option(BUILD_RBUS_UNIT_TEST "BUILD_RBUS_UNIT_TEST" OFF)
 	option(BUILD_RBUS_BENCHMARK_TEST "BUILD_RBUS_BENCHMARK_TEST" OFF)
-endif (BUILD_RBUS)
 
 if (BUILD_FOR_DESKTOP)
 	ExternalProject_Add(
@@ -95,8 +87,8 @@ if (BUILD_FOR_DESKTOP)
 		GIT_TAG 2.1.4
 		BUILD_IN_SOURCE 0
 		UPDATE_DISCONNECTED 1
-		PREFIX ${CMAKE_SOURCE_DIR}/msgpack
-		BINARY_DIR ${CMAKE_SOURCE_DIR}/msgpack/build
+		PREFIX ${CMAKE_CURRENT_BINARY_DIR}/msgpack
+		BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/msgpack/build
 		CMAKE_ARGS "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
 		BUILD_COMMAND make)
 endif (BUILD_FOR_DESKTOP)
@@ -105,10 +97,10 @@ if (BUILD_FOR_DESKTOP)
 	message("Building for desktop")
 	include_directories(
 		${CMAKE_CURRENT_SOURCE_DIR}
-		${CMAKE_CURRENT_SOURCE_DIR}/msgpack/src/msgpack/include)
+		${CMAKE_CURRENT_BINARY_DIR}/msgpack/src/msgpack/include)
 	link_directories(
 		${CMAKE_CURRENT_SOURCE_DIR}
-		${CMAKE_CURRENT_SOURCE_DIR}/msgpack/build
+		${CMAKE_CURRENT_BINARY_DIR}/msgpack/build
 		${CMAKE_BINARY_DIR}
 		${LIBRARY_DIR})
 	if (ENABLE_RDKLOGGER)
@@ -121,153 +113,16 @@ else()
 		include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${INCLUDE_DIR} ${INCLUDE_DIR}/messagepack ${RDKLOGGER_PATH} ${RDKLOGGER_PATH}/include)
 		link_directories(${CMAKE_CURRENT_SOURCE_DIR} ${LIBRARY_DIR} ${RDKLOGGER_PATH}/src/.libs/)
 		add_definitions(-DENABLE_RDKLOGGER)
+    set(RDKLOGGER_LIBRARIES "-lrdkloggers")
 	else ()
 		include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${INCLUDE_DIR} ${INCLUDE_DIR}/messagepack)
 		link_directories(${CMAKE_CURRENT_SOURCE_DIR} ${LIBRARY_DIR})
+    set(RDKLOGGER_LIBRARIES "")
 	endif (ENABLE_RDKLOGGER)
 endif (BUILD_FOR_DESKTOP)
 
-set(RTMESSAGE_LINK_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR} ${LIBRARY_DIR} ${RDKLOGGER_PATH}/src/.libs/)
-
-if (ENABLE_RTMESSAGE_PROFILE)
-	message("Enabling rtMessage profile")
-	set(CMAKE_CFLAGS "${CMAKE_C_FLAGS} -pg")
-endif (ENABLE_RTMESSAGE_PROFILE)
-
-if (BUILD_RTMESSAGE_LIB)
-	message("Building rtMessage lib")
-	add_library(
-		rtMessage 
-		SHARED
-		rtConnection.c
-		rtLog.c
-		rtError.c
-		rtMessageHeader.c
-		rtEncoder.c
-		rtMessage_mpack.c
-		rtSocket.c
-		rtVector.c
-        rtList.c
-        rtRetainable.c
-		base64.c
-		routing_tree.c
-		local_benchmarking.c)
-	if (BUILD_FOR_DESKTOP)
-		add_dependencies(rtMessage msgpack)
-	endif(BUILD_FOR_DESKTOP)
-    if (ENABLE_RDKLOGGER)
-		target_link_libraries(rtMessage -llog4c -lrdkloggers)
-	endif (ENABLE_RDKLOGGER)
-	target_link_libraries(rtMessage ${LIBRARY_LINKER_OPTIONS} -pthread -lmsgpackc)
-	set_target_properties(rtMessage
-		PROPERTIES SOVERSION "0"
-		VERSION "${PROJECT_VERSION}")
-endif (BUILD_RTMESSAGE_LIB)
-
-if (BUILD_RBUS)
 	add_subdirectory(rbus-core/lib)
 	add_subdirectory(rbus-core/test)
 	add_subdirectory(rbus-core/session_manager)
-endif (BUILD_RBUS)
 
-if (BUILD_DATAPROVIDER_LIB)
-	add_library(
-		dataProvider
-		SHARED
-		dataProvider/dmProviderDatabase.cpp
-		dataProvider/dmProviderHost.cpp
-		dataProvider/dmPropertyInfo.cpp
-		dataProvider/dmProviderInfo.cpp
-		dataProvider/dmQueryResult.cpp
-		dataProvider/dmProvider.cpp
-		dataProvider/dmError.cpp
-		dataProvider/dmValue.cpp)
-	add_dependencies(
-		dataProvider
-		rtMessage)
-	target_link_libraries(
-		dataProvider
-		rtMessage)
-endif (BUILD_DATAPROVIDER_LIB)
 
-if (BUILD_RTMESSAGE_ROUTED)
-	message ("Building rtrouted")
-	set(CMAKE_CFLAGS " ${CMAKE_C_FLAGS}")
-	add_executable(rtrouted rtrouted.c)
-	if (BUILD_FOR_DESKTOP)
-		add_dependencies(rtrouted msgpack)
-	endif(BUILD_FOR_DESKTOP)
-	target_link_libraries(rtrouted ${LIBRARY_LINKER_OPTIONS} rtMessage)
-endif (BUILD_RTMESSAGE_ROUTED)
-
-if (BUILD_DMCLI)
-	add_executable(dmcli dataProvider/dmcli.cpp)
-	if (BUILD_FOR_DESKTOP)
-		add_dependencies(dmcli msgpack rtMessage dataProvider)
-		add_definitions("-DDEFAULT_DATAMODELDIR=\"${CMAKE_CURRENT_SOURCE_DIR}/dataProvider/data\"")
-	else()
-		add_definitions("-DDEFAULT_DATAMODELDIR=\"${RDK_FSROOT_PATH}/etc/model\"")
-	endif (BUILD_FOR_DESKTOP)
-	target_link_libraries(dmcli dataProvider rtMessage)
-endif (BUILD_DMCLI)
-
-if (BUILD_DMCLI_SAMPLE_APP)
-	# sample provider for general
-	add_executable(sample_provider_gen dataProvider/sample_provider_gen.cpp)
-	if (BUILD_FOR_DESKTOP)
-		add_dependencies(sample_provider_gen dataProvider)
-	endif (BUILD_FOR_DESKTOP)
-	target_link_libraries(sample_provider_gen ${LIBRARY_LINKER_OPTIONS} rtMessage dataProvider)
-	# sample provider for wifi
-	add_executable(sample_provider_wifi dataProvider/sample_provider_wifi.cpp)
-	if (BUILD_FOR_DESKTOP)
-		add_dependencies(sample_provider_wifi dataProvider)
-	endif (BUILD_FOR_DESKTOP)
-	target_link_libraries(sample_provider_wifi ${LIBRARY_LINKER_OPTIONS} rtMessage dataProvider)
-endif (BUILD_DMCLI_SAMPLE_APP)
-
-if (BUILD_RTMESSAGE_SAMPLE_APP)
-	# sample_send
-	add_executable(sample_send sample_send.c)
-	if (BUILD_FOR_DESKTOP)
-		add_dependencies(sample_send msgpack)
-	endif (BUILD_FOR_DESKTOP)
-	add_dependencies(sample_send rtMessage)
-	target_link_libraries(sample_send ${LIBRARY_LINKER_OPTIONS} rtMessage)
-
-	# sample_recv
-	add_executable(sample_recv sample_recv.c)
-	if (BUILD_FOR_DESKTOP)
-		add_dependencies(sample_recv msgpack)
-	endif (BUILD_FOR_DESKTOP)
-	add_dependencies(sample_send rtMessage)
-	target_link_libraries(sample_recv ${LIBRARY_LINKER_OPTIONS} rtMessage)
-
-	# sample_req
-	add_executable(sample_req sample_req.c)
-	if (BUILD_FOR_DESKTOP)
-		add_dependencies(sample_req msgpack)
-	endif (BUILD_FOR_DESKTOP)
-	add_dependencies(sample_send rtMessage)
-	target_link_libraries(sample_req ${LIBRARY_LINKER_OPTIONS} rtMessage)
-
-	# sample_res
-	add_executable(sample_res sample_res.c)
-	if (BUILD_FOR_DESKTOP)
-		add_dependencies(sample_res msgpack)
-	endif (BUILD_FOR_DESKTOP)
-	add_dependencies(sample_send rtMessage)
-	target_link_libraries(sample_res ${LIBRARY_LINKER_OPTIONS} rtMessage)
-	
-    # diag_probe
-	add_executable(rtm_diag_probe diag_probe.c)
-	add_dependencies(rtm_diag_probe rtMessage)
-	target_link_libraries(rtm_diag_probe ${LIBRARY_LINKER_OPTIONS} rtMessage)
-endif (BUILD_RTMESSAGE_SAMPLE_APP)
-
-if (BUILD_RTMESSAGE_ONLY)
-	install (TARGETS rtrouted rtMessage rtm_diag_probe
-		RUNTIME DESTINATION bin
-		LIBRARY DESTINATION lib)
-	install(FILES rtMessage.h rtMessageHeader.h rtError.h rtConnection.h rtVector.h rtRetainable.h rtLog.h rtList.h rtm_discovery_api.h DESTINATION "include/rbus-core")
-endif (BUILD_RTMESSAGE_ONLY)

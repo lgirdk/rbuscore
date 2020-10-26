@@ -26,7 +26,7 @@ Test Case : Testing rbus communications from client end
 #include <stdbool.h>
 extern "C" {
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 }
 #include "gtest_app.h"
 
@@ -100,15 +100,15 @@ static bool CALL_RBUS_PULL_OBJECT(char* expected_data, char* server_obj)
 {
     bool result = false;
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    rtMessage response;
+    rbusMessage response;
     if((err = rbus_pullObj(server_obj, 1000, &response)) == RTMESSAGE_BUS_SUCCESS)
     {
         const char* buff = NULL;
         printf("Received object %s\n", server_obj);
-        rbus_GetString(response, MESSAGE_FIELD_PAYLOAD, &buff);
+        rbusMessage_GetString(response, &buff);
         printf("Payload: %s\n", buff);
         EXPECT_STREQ(buff, expected_data) << "rbus_pullObj failed to procure the server's initial string -init init init- ";
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
         result = true;
     }
     else
@@ -119,24 +119,13 @@ static bool CALL_RBUS_PULL_OBJECT(char* expected_data, char* server_obj)
     return result;
 }
 
-static bool CALL_RBUS_PUSH_OBJECT(char* data, char* server_obj)
-{
-    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    rtMessage setter;
-    rtMessage_Create(&setter);
-    rbus_SetString(setter, MESSAGE_FIELD_PAYLOAD, data);
-    err = rbus_pushObj(server_obj, setter, 1000);
-    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_pushObj failed";
-    return true;
-}
-
-static int event_callback(const char * object_name,  const char * event_name, rtMessage message, void * user_data) 
+static int event_callback(const char * object_name,  const char * event_name, rbusMessage message, void * user_data) 
 {
      (void) user_data;
      char* buff = NULL;
     uint32_t buff_length = 0;
     printf("In event callback for object %s, event %s.\n", object_name, event_name);
-    rtMessage_ToString(message, &buff, &buff_length);
+    rbusMessage_ToDebugString(message, &buff, &buff_length);
     printf("dumpMessage: %.*s\n", buff_length, buff);
     free(buff);
     return 0;

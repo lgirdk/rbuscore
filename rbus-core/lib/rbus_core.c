@@ -25,9 +25,13 @@
 #include <ctype.h>
 
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
 #include "rtLog.h"
 #include "rtVector.h"
+
+void rbusMessage_BeginMetaSectionWrite(rbusMessage message);
+void rbusMessage_EndMetaSectionWrite(rbusMessage message);
+void rbusMessage_BeginMetaSectionRead(rbusMessage message);
+void rbusMessage_EndMetaSectionRead(rbusMessage message);
 
 /* Begin constant definitions.*/
 static const unsigned int TIMEOUT_VALUE_FIRE_AND_FORGET = 1000;
@@ -180,7 +184,7 @@ void server_object_destroy(void* p)
     free(obj);
 }
 
-rbus_error_t server_object_subscription_handler(server_object_t obj, const char * event, char const* subscriber, int added, rtMessage filter)
+rbus_error_t server_object_subscription_handler(server_object_t obj, const char * event, char const* subscriber, int added, rbusMessage filter)
 {
     if((NULL == event) || (NULL == subscriber) ||
        (MAX_SUBSCRIBER_NAME_LENGTH <= strlen(subscriber)) || 
@@ -219,11 +223,11 @@ rbus_error_t server_object_subscription_handler(server_object_t obj, const char 
 typedef struct _queued_request
 {
     rtMessageHeader hdr;
-    rtMessage msg;
+    rbusMessage msg;
     server_object_t obj;
 } *queued_request_t;
 
-void queued_request_create(queued_request_t* req, rtMessageHeader hdr, rtMessage msg, server_object_t obj)
+void queued_request_create(queued_request_t* req, rtMessageHeader hdr, rbusMessage msg, server_object_t obj)
 {
     (*req) = malloc(sizeof(struct _queued_request));
     (*req)->hdr = hdr;
@@ -304,7 +308,7 @@ static int unlock()
 	return pthread_mutex_unlock(&g_mutex);
 }
 
-static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rtMessage filter);
+static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rbusMessage filter);
 
 static void perform_init()
 {
@@ -355,15 +359,15 @@ static void perform_cleanup()
     pthread_mutex_destroy(&g_mutex);
 }
 
-rbus_error_t set_message_method(rtMessage msg, const char *method)
+rbus_error_t set_message_method(rbusMessage msg, const char *method)
 {
-    rtMessage_BeginMetaSectionWrite(msg);
-    rtMessage_SetString(msg, MESSAGE_FIELD_METHOD, method);
-    rtMessage_EndMetaSectionWrite(msg);
-	return RTMESSAGE_BUS_SUCCESS;
+    rbusMessage_BeginMetaSectionWrite(msg);
+    rbusMessage_SetString(msg, method);
+    rbusMessage_EndMetaSectionWrite(msg);
+	  return RTMESSAGE_BUS_SUCCESS;
 }
 #if 0 /*mrollins cannot use this after converting g_server_objects to a dynamic rtVector*/
-static int dummyOnMessage(const char *, const char *, rtMessage, void *, rtMessage *)
+static int dummyOnMessage(const char *, const char *, rtMessage, void *, rbusMessage *)
 {
 	/*do nothing.*/
 	return 0;
@@ -383,16 +387,16 @@ static rbus_error_t translate_rt_error(rtError err)
         return RTMESSAGE_BUS_ERROR_GENERAL;
 }
 
-static void dispatch_method_call(rtMessage msg, const rtMessageHeader *hdr, server_object_t obj)
+static void dispatch_method_call(rbusMessage msg, const rtMessageHeader *hdr, server_object_t obj)
 {
     rtError err = RT_OK;
     const char* method_name = NULL;
-    rtMessage response = NULL;
+    rbusMessage response = NULL;
     bool handler_invoked = false;
     
-    rtMessage_BeginMetaSectionRead(msg);
-    err = rtMessage_GetString(msg, MESSAGE_FIELD_METHOD, &method_name);
-    rtMessage_EndMetaSectionRead(msg);
+    rbusMessage_BeginMetaSectionRead(msg);
+    err = rbusMessage_GetString(msg, &method_name);
+    rbusMessage_EndMetaSectionRead(msg);
     
     lock();
     if( rtVector_Size(obj->methods) > 0 && RT_OK == err)
@@ -416,8 +420,11 @@ static void dispatch_method_call(rtMessage msg, const rtMessageHeader *hdr, serv
     rbus_sendResponse(hdr, response);
 }
 
-static void onMessage(rtMessageHeader const* hdr, rtMessage msg, void* closure)
+static void onMessage(rtMessageHeader const* hdr, uint8_t const* data, uint32_t dataLen, void* closure)
 {
+    rbusMessage msg;
+    rbusMessage_FromBytes(&msg, data, dataLen);
+
     /*using namespace rbus_server;*/
     static int stack_counter = 0;
     stack_counter++;
@@ -444,6 +451,8 @@ static void onMessage(rtMessageHeader const* hdr, rtMessage msg, void* closure)
         }
     }
     stack_counter--;
+
+    rbusMessage_Release(msg);
     return;
 }
 
@@ -544,7 +553,7 @@ rbus_error_t rbus_openBrokerConnection(const char * component_name)
 	return rbus_openBrokerConnection2(component_name, g_daemon_address);
 }
 
-static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rtMessage filter)
+static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rbusMessage filter)
 {
     /* Method definition to add new event subscription: 
      * method name: METHOD_ADD_EVENT_SUBSCRIPTION / METHOD_REMOVE_EVENT_SUBSCRIPTION.
@@ -553,14 +562,14 @@ static rbus_error_t send_subscription_request(const char * object_name, const ch
      * integer, mapped to key MESSAGE_FIELD_RESULT. 0 is success. Anything else is a failure. */
     rbus_error_t ret;
 
-    rtMessage request, response;
-    rtMessage_Create(&request);
+    rbusMessage request, response;
+    rbusMessage_Init(&request);
 
-    rbus_SetString(request, MESSAGE_FIELD_EVENT_NAME, event_name);
-    rbus_SetString(request, MESSAGE_FIELD_EVENT_SENDER, rtConnection_GetReturnAddress(g_connection));
-    rbus_SetInt32(request, MESSAGE_FIELD_EVENT_HAS_FILTER, filter ? 1 : 0);
+    rbusMessage_SetString(request, event_name);
+    rbusMessage_SetString(request, rtConnection_GetReturnAddress(g_connection));
+    rbusMessage_SetInt32(request, filter ? 1 : 0);
     if(filter)
-        rbus_AddMessage(request, MESSAGE_FIELD_EVENT_FILTER, filter);
+        rbusMessage_SetMessage(request, filter);
 
     ret = rbus_invokeRemoteMethod(object_name, (activate? METHOD_ADD_EVENT_SUBSCRIPTION : METHOD_REMOVE_EVENT_SUBSCRIPTION),
             request, TIMEOUT_VALUE_FIRE_AND_FORGET, &response);
@@ -568,7 +577,7 @@ static rbus_error_t send_subscription_request(const char * object_name, const ch
     {
         rtError extract_ret;
         int result;
-        extract_ret = rtMessage_GetInt32(response, MESSAGE_FIELD_RESULT, &result);
+        extract_ret = rbusMessage_GetInt32(response, &result);
         if(RT_OK == extract_ret)
         {
             if(RTMESSAGE_BUS_SUCCESS == result)
@@ -590,7 +599,7 @@ static rbus_error_t send_subscription_request(const char * object_name, const ch
             rtLog_Error("Error adding subscription for %s::%s. Received unexpected response.", object_name, event_name);
             ret = RTMESSAGE_BUS_ERROR_MALFORMED_RESPONSE;
         }
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     else
     {
@@ -657,7 +666,7 @@ rbus_error_t rbus_registerObj(const char * object_name, rbus_callback_t handler,
 
     server_object_create(&obj, object_name, handler, user_data);
 
-    //TODO: callback signature translation. rtMessage uses a significantly wider signature for callbacks. Translate to something simpler.
+    //TODO: callback signature translation. rbusMessage uses a significantly wider signature for callbacks. Translate to something simpler.
     err = rtConnection_AddListener(g_connection, object_name, onMessage, obj);
 
     if(RT_OK == err)
@@ -883,11 +892,11 @@ rbus_error_t rbus_removeElement(const char * object, const char * element)
     return RTMESSAGE_BUS_SUCCESS;
 }
 
-rbus_error_t rbus_pushObj(const char * object_name, rtMessage message, int timeout_millisecs)
+rbus_error_t rbus_pushObj(const char * object_name, rbusMessage message, int timeout_millisecs)
 {
     rtError err = RT_OK;
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
-    rtMessage response = NULL;
+    rbusMessage response = NULL;
     if((ret = rbus_invokeRemoteMethod(object_name, METHOD_SETPARAMETERVALUES, message, timeout_millisecs, &response)) != RTMESSAGE_BUS_SUCCESS)
     {
         rtLog_Error("Failed to send message. Error code: 0x%x", err);
@@ -896,7 +905,7 @@ rbus_error_t rbus_pushObj(const char * object_name, rtMessage message, int timeo
     else
     {
         int result = RTMESSAGE_BUS_SUCCESS;
-        if((err = rtMessage_GetInt32(response, MESSAGE_FIELD_RESULT, &result) == RT_OK))
+        if((err = rbusMessage_GetInt32(response, &result) == RT_OK))
         {
             ret = (rbus_error_t)result;
         }
@@ -905,13 +914,34 @@ rbus_error_t rbus_pushObj(const char * object_name, rtMessage message, int timeo
             rtLog_Error("%s.", stringify(RTMESSAGE_BUS_ERROR_MALFORMED_RESPONSE));
             ret = RTMESSAGE_BUS_ERROR_MALFORMED_RESPONSE;
         }
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     return ret;
 }
 
+static rtError rbus_sendRequest(rtConnection con, rbusMessage req, char const* topic, rbusMessage* res, int32_t timeout)
+{
+    rtError err = RT_OK;
+    uint8_t* data = NULL;
+    uint32_t dataLength = 0;
+    uint8_t* rspData = NULL;
+    uint32_t rspDataLength = 0;
 
-rbus_error_t rbus_invokeRemoteMethod(const char * object_name, const char *method, rtMessage out, int timeout_millisecs, rtMessage *in)
+    rbusMessage_ToBytes(req, &data, &dataLength);
+
+    err = rtConnection_SendBinaryRequest(con, data, dataLength, topic, &rspData, &rspDataLength, timeout);
+
+    if(err == RT_OK)
+    {
+        rbusMessage_FromBytes(res, rspData, rspDataLength);
+    }
+
+    rtMessage_FreeByteArray(rspData);
+
+    return err;
+}
+
+rbus_error_t rbus_invokeRemoteMethod(const char * object_name, const char *method, rbusMessage out, int timeout_millisecs, rbusMessage *in)
 {
     rtError err = RT_OK;
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
@@ -923,10 +953,10 @@ rbus_error_t rbus_invokeRemoteMethod(const char * object_name, const char *metho
 
     *in = NULL;
     if(NULL == out)
-        rtMessage_Create(&out);
+        rbusMessage_Init(&out);
 
     set_message_method(out, method);
-    err = rtConnection_SendRequest(g_connection, out, object_name, in, timeout_millisecs);
+    err = rbus_sendRequest(g_connection, out, object_name, in, timeout_millisecs);
     if(RT_OK != err)
     {
         if(RT_OBJECT_NO_LONGER_AVAILABLE == err)
@@ -949,9 +979,9 @@ rbus_error_t rbus_invokeRemoteMethod(const char * object_name, const char *metho
     {
 
         method = NULL;
-        rtMessage_BeginMetaSectionRead(*in);
-		rtMessage_GetString(*in, MESSAGE_FIELD_METHOD, &method);
-        rtMessage_EndMetaSectionRead(*in);
+        rbusMessage_BeginMetaSectionRead(*in);
+		    rbusMessage_GetString(*in, &method);
+        rbusMessage_EndMetaSectionRead(*in);
         if(NULL != method)
         {
             if(0 != strncmp(METHOD_RESPONSE, method, MAX_METHOD_NAME_LENGTH))
@@ -967,10 +997,10 @@ rbus_error_t rbus_invokeRemoteMethod(const char * object_name, const char *metho
         }
     }
 
-    rtMessage_Release(out);
+    rbusMessage_Release(out);
     if((RTMESSAGE_BUS_SUCCESS != ret) && (NULL != *in))
     {
-        rtMessage_Release(*in);
+        rbusMessage_Release(*in);
         *in = NULL;
     }
     return ret;
@@ -978,12 +1008,12 @@ rbus_error_t rbus_invokeRemoteMethod(const char * object_name, const char *metho
 
 
 /*TODO: make this really fire and forget.*/
-rbus_error_t rbus_pushObjNoAck(const char * object_name, rtMessage message)
+rbus_error_t rbus_pushObjNoAck(const char * object_name, rbusMessage message)
 {
 	return rbus_pushObj(object_name, message, TIMEOUT_VALUE_FIRE_AND_FORGET);
 }
 
-rbus_error_t rbus_pullObj(const char * object_name, int timeout_millisecs, rtMessage *response)
+rbus_error_t rbus_pullObj(const char * object_name, int timeout_millisecs, rbusMessage *response)
 {
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
     rtError err = RT_OK;
@@ -994,7 +1024,7 @@ rbus_error_t rbus_pullObj(const char * object_name, int timeout_millisecs, rtMes
     else
     {
         int result = RTMESSAGE_BUS_SUCCESS;
-        if((err = rtMessage_GetInt32(*response, MESSAGE_FIELD_RESULT, &result) == RT_OK))
+        if((err = rbusMessage_GetInt32(*response, &result) == RT_OK))
         {
             ret = (rbus_error_t)result;
         }
@@ -1005,57 +1035,58 @@ rbus_error_t rbus_pullObj(const char * object_name, int timeout_millisecs, rtMes
         }
         if(RTMESSAGE_BUS_SUCCESS != ret) 
         {
-            rtMessage_Release(*response);
+            rbusMessage_Release(*response);
             *response = NULL;
         }
     }
     return ret;
 }
 
-rbus_error_t rbus_sendMessage(rtMessage message, const char * destination, const char * sender)
+static rbus_error_t rbus_sendMessage(rbusMessage msg, const char * destination, const char * sender)
 {
-    rtError ret = rtConnection_SendMessageWithSenderInfo(g_connection, message, destination, sender);
+    rtError ret;
+    uint8_t* data = NULL;
+    uint32_t dataLength = 0;
+
+    rbusMessage_ToBytes(msg, &data, &dataLength);
+    ret = rtConnection_SendBinaryDirect(g_connection, data, dataLength, destination, sender);
     return translate_rt_error(ret);
 }
 
 void ack();
 
-static int subscription_handler(const char *not_used, const char * method_name, rtMessage in, void * user_data, rtMessage *out, const rtMessageHeader* hdr)
+static int subscription_handler(const char *not_used, const char * method_name, rbusMessage in, void * user_data, rbusMessage *out, const rtMessageHeader* hdr)
 {
     (void) hdr;
     /*using namespace rbus_server;*/
     const char * sender = NULL;
     const char * event_name = NULL;
     int has_filter = 0;
-    rtMessage filter = NULL;
+    rbusMessage filter = NULL;
     server_object_t obj = (server_object_t)user_data;
     (void)not_used;
 
-    if(RT_OK != rtMessage_Create(out))
-    {
-        rtLog_Error("Unable to create response message.");
-        return -1;
-    }
+    rbusMessage_Init(out);
 
-    if((RT_OK == rtMessage_GetString(in, MESSAGE_FIELD_EVENT_NAME, &event_name)) &&
-        (RT_OK == rtMessage_GetString(in, MESSAGE_FIELD_EVENT_SENDER, &sender))) 
+    if((RT_OK == rbusMessage_GetString(in, &event_name)) &&
+        (RT_OK == rbusMessage_GetString(in, &sender))) 
     {
         /*Extract arguments*/
         if((NULL == sender) || (NULL == event_name))
         {
             rtLog_Error("Malformed subscription request. Sender: %s. Event: %s.", sender, event_name);
-            rtMessage_SetInt32(*out, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_ERROR_INVALID_PARAM);
+            rbusMessage_SetInt32(*out, RTMESSAGE_BUS_ERROR_INVALID_PARAM);
         }
         else
         {
-            rbus_GetInt32(in, MESSAGE_FIELD_EVENT_HAS_FILTER, &has_filter);
+            rbusMessage_GetInt32(in, &has_filter);
             if(has_filter)
-                rtMessage_GetMessage(in, MESSAGE_FIELD_EVENT_FILTER, &filter);
+                rbusMessage_GetMessage(in, &filter);
             int added = strncmp(method_name, METHOD_ADD_EVENT_SUBSCRIPTION, MAX_METHOD_NAME_LENGTH) == 0 ? 1 : 0;
             rbus_error_t ret = server_object_subscription_handler(obj, event_name, sender, added, filter);
             if(filter)
-                rtMessage_Release(filter);
-            rtMessage_SetInt32(*out, MESSAGE_FIELD_RESULT, ret);
+                rbusMessage_Release(filter);
+            rbusMessage_SetInt32(*out, ret);
         }
     }
     
@@ -1178,8 +1209,13 @@ rbus_error_t rbus_unregisterEvent(const char* object_name, const char * event_na
     unlock();
     return ret;
 }
-static void master_event_callback(const rtMessageHeader* hdr, rtMessage msg, void* closure)
+
+static void master_event_callback(rtMessageHeader const* hdr, uint8_t const* data, uint32_t dataLen, void* closure)
 {
+    rbusMessage msg;
+
+    rbusMessage_FromBytes(&msg, data, dataLen);
+
     /*using namespace rbus_client;*/
     const char * sender = hdr->reply_topic;
     const char * event_name = NULL;
@@ -1194,12 +1230,13 @@ static void master_event_callback(const rtMessageHeader* hdr, rtMessage msg, voi
         rtLog_Error("Object name length exceeds limits.");
         return;
     }
-    rtMessage_BeginMetaSectionRead(msg);
-    err = rtMessage_GetString(msg, MESSAGE_FIELD_EVENT_NAME, &event_name);
-    rtMessage_EndMetaSectionRead(msg);
+    rbusMessage_BeginMetaSectionRead(msg);
+    err = rbusMessage_GetString(msg, &event_name);
+    rbusMessage_EndMetaSectionRead(msg);
     if(RT_OK != err)
     {
         rtLog_Error("Event message doesn't contain an event name.");
+        rbusMessage_Release(msg);
         return;
     }
     
@@ -1218,6 +1255,7 @@ static void master_event_callback(const rtMessageHeader* hdr, rtMessage msg, voi
             {
                 unlock();
                 evt->callback(sender, event_name, msg, evt->data);
+                rbusMessage_Release(msg);
                 return;
             }
             /* support rbus events being elements : keep searching */
@@ -1225,6 +1263,7 @@ static void master_event_callback(const rtMessageHeader* hdr, rtMessage msg, voi
     }
     /* If no matching objects exist in records. Create a new entry.*/
     unlock();
+    rbusMessage_Release(msg);
     rtLog_Warn("Received event %s::%s for which no subscription exists.", sender, event_name);
     return;
 }
@@ -1262,7 +1301,7 @@ static rbus_error_t remove_subscription_callback(const char * object_name,  cons
     return ret;
 }
 
-rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rtMessage filter, void * user_data)
+rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage filter, void * user_data)
 {
     /*using namespace rbus_client;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
@@ -1362,7 +1401,7 @@ rbus_error_t rbus_unsubscribeFromEvent(const char * object_name,  const char * e
     return ret;
 }
 
-rbus_error_t rbus_publishEvent(const char* object_name,  const char * event_name, rtMessage out)
+rbus_error_t rbus_publishEvent(const char* object_name,  const char * event_name, rbusMessage out)
 {
     /*using namespace rbus_server;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
@@ -1373,10 +1412,10 @@ rbus_error_t rbus_publishEvent(const char* object_name,  const char * event_name
         rtLog_Error("Object name is too long.");
         return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
     }
-    rtMessage_BeginMetaSectionWrite(out);
-    rbus_SetString(out, MESSAGE_FIELD_EVENT_NAME, event_name);
-    rbus_SetString(out, MESSAGE_FIELD_EVENT_SENDER, object_name); 
-    rtMessage_EndMetaSectionWrite(out);
+    rbusMessage_BeginMetaSectionWrite(out);
+    rbusMessage_SetString(out, event_name);
+    rbusMessage_SetString(out, object_name); 
+    rbusMessage_EndMetaSectionWrite(out);
 
     lock();
     server_object_t obj = get_object(object_name);
@@ -1445,7 +1484,7 @@ rbus_error_t rbus_registerSubscribeHandler(const char* object_name, rbus_event_s
     return ret;
 }
 
-rbus_error_t rbus_publishSubscriberEvent(const char* object_name,  const char * event_name, const char* listener, rtMessage out)
+rbus_error_t rbus_publishSubscriberEvent(const char* object_name,  const char * event_name, const char* listener, rbusMessage out)
 {
     /*using namespace rbus_server;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
@@ -1456,10 +1495,10 @@ rbus_error_t rbus_publishSubscriberEvent(const char* object_name,  const char * 
         rtLog_Error("Object name is too long.");
         return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
     }
-    rtMessage_BeginMetaSectionWrite(out);
-    rbus_SetString(out, MESSAGE_FIELD_EVENT_NAME, event_name);
-    rbus_SetString(out, MESSAGE_FIELD_EVENT_SENDER, object_name); 
-    rtMessage_EndMetaSectionWrite(out);
+    rbusMessage_BeginMetaSectionWrite(out);
+    rbusMessage_SetString(out, event_name);
+    rbusMessage_SetString(out, object_name); 
+    rbusMessage_EndMetaSectionWrite(out);
     lock();
     server_object_t obj = get_object(object_name);
     if(NULL == obj)
@@ -1476,114 +1515,187 @@ rbus_error_t rbus_publishSubscriberEvent(const char* object_name,  const char * 
     return ret;
 }
 
-rbus_error_t rbus_registeredComponents(rtMessage *in)
+rbus_error_t rbus_discoverWildcardDestinations(const char * expression, int * count, char *** destinations)
 {
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
     rtError err = RT_OK;
-    rtMessage out;
-    rtMessage_Create(&out);
-    rtMessage_SetInt32(out, "dummy", 0); //Necessary because zero length payloads trip up rtMessage.
-    err = rtConnection_SendRequest(g_connection, out, REGISTERED_COMPONENTS, in, TIMEOUT_VALUE_FIRE_AND_FORGET);
-    if(RT_OK == err)
-        ret = RTMESSAGE_BUS_SUCCESS;
-    else
-    {
-        rtLog_Error("Failed with error code %d", err);
-        ret = RTMESSAGE_BUS_ERROR_GENERAL;
-    }
-    rtMessage_Release(out);
-    return ret;
-}
+    rtMessage msg, rsp;
 
-rbus_error_t rbus_GetElementsAddedByObject(const char * expression, rtMessage *in)
-{
-    rtError err = RT_OK;
-    rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+    rtMessage_Create(&msg);
+    rtMessage_SetString(msg, RTM_DISCOVERY_EXPRESSION, expression);
 
-    rtMessage out;
-    rtMessage_Create(&out);
-    rtMessage_SetString(out, ELEMENT_ENUMERATION_OBJECT, expression);
+    err = rtConnection_SendRequest(g_connection, msg, RTM_DISCOVER_WILDCARD_DESTINATIONS, &rsp, TIMEOUT_VALUE_FIRE_AND_FORGET);
 
-    err = rtConnection_SendRequest(g_connection, out, ELEMENT_ENUMERATION, in, TIMEOUT_VALUE_FIRE_AND_FORGET);
-    if(RT_OK == err)
-        ret = RTMESSAGE_BUS_SUCCESS;
-    else
-        ret = RTMESSAGE_BUS_ERROR_GENERAL;
-
-    rtMessage_Release(out);
-
-    return ret;
-}
-
-rbus_error_t rbus_resolveWildcardDestination(const char * expression, int * num_entries, rtMessage *in)
-{
-    rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
-    rtError err = RT_OK;
-    rtMessage out;
-    rtMessage_Create(&out);
-    rtMessage_SetString(out, RTM_DISCOVERY_EXPRESSION, expression);
-    err = rtConnection_SendRequest(g_connection, out, RTM_DISCOVERY_DESTINATION, in, TIMEOUT_VALUE_FIRE_AND_FORGET);
-    if(RT_OK == err)
-    {
-        int result;
-        if((RT_OK == rbus_GetInt32(*in, RTM_DISCOVERY_RESULT, &result)) && (RTM_DISCOVERY_RESULT_SUCCESS == result))
-        {
-            rtMessage_GetInt32(*in, RTM_DISCOVERY_NUM_ENTRIES, num_entries);
-            ret = RTMESSAGE_BUS_SUCCESS;
-        }
-        else
-        {
-            ret = RTMESSAGE_BUS_ERROR_GENERAL;
-            rtMessage_Release(*in);
-        }
-    }
-    else
-        ret = RTMESSAGE_BUS_ERROR_MALFORMED_RESPONSE;
-    rtMessage_Release(out);
-    return ret;
-}
-
-rbus_error_t rbus_findMatchingObjects(const char* elements[], const int len, char *** objects)
-{
-    rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
-    rtError err = RT_OK;
-    rtMessage out, in;
-
-    if(1 > len)
-    {
-        rtLog_Error("List is empty.");
-        return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
-    }
-
-    rtMessage_Create(&out);
-    rbus_AppendInt32(out, len);
-    for(int i = 0; i < len; i++)
-    {
-        if(NULL != elements[i])
-            rbus_AppendString(out, elements[i]);
-        else
-        {
-            rtLog_Error("Null entries in element list.");
-            rtMessage_Release(out);
-            return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
-        }    
-    }
-    err = rtConnection_SendRequest(g_connection, out, TRACE_ORIGIN_OBJECT, &in, TIMEOUT_VALUE_FIRE_AND_FORGET);
+    rtMessage_Release(msg);
+    msg = rsp;
 
     if(RT_OK == err)
     {
         int result;
         const char * value = NULL;
-        if((RT_OK == rbus_PopInt32(in, &result)) && (RTM_DISCOVERY_RESULT_SUCCESS == result))
+
+        if((RT_OK == rtMessage_GetInt32(msg, RTM_DISCOVERY_RESULT, &result)) && (RT_OK == result))
         {
-            char **array_ptr = (char **)malloc(len * sizeof(char *));
+            int32_t size, length, i;
+
+            rtMessage_GetInt32(msg, RTM_DISCOVERY_COUNT, &size);
+            rtMessage_GetArrayLength(msg, RTM_DISCOVERY_ITEMS, &length);
+
+            if(size != length)
+            {
+                rtLog_Error("rbus_resolveWildcardDestination size missmatch\n");
+            }
+
+            char **array_ptr = (char **)malloc(size * sizeof(char *));
+            *count = size;
+            if (NULL != array_ptr)
+            {
+                *destinations = array_ptr;
+                memset(array_ptr, 0, (length * sizeof(char *)));
+                for (i = 0; i < length; i++)
+                {
+                    if ((RT_OK != rtMessage_GetStringItem(msg, RTM_DISCOVERY_ITEMS, i, &value)) || (NULL == (array_ptr[i] = strndup(value, MAX_OBJECT_NAME_LENGTH))))
+                    {
+                        for (int j = 0; j < i; j++)
+                            free(array_ptr[j]);
+                        free(array_ptr);
+                        rtLog_Error("Read/Memory allocation failure");
+                        ret = RTMESSAGE_BUS_ERROR_GENERAL;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                rtLog_Error("Memory allocation failure");
+                ret = RTMESSAGE_BUS_ERROR_INSUFFICIENT_MEMORY;
+            }
+
+            rtMessage_Release(msg);
+
+            ret = RTMESSAGE_BUS_SUCCESS;
+
+        }
+        else
+        {
+            ret = RTMESSAGE_BUS_ERROR_GENERAL;
+            rtMessage_Release(msg);
+        }
+    }
+    else
+    {
+        ret = RTMESSAGE_BUS_ERROR_MALFORMED_RESPONSE;
+    }
+    return ret;
+}
+
+rbus_error_t rbus_discoverObjectElements(const char * object, int * count, char *** elements)
+{
+    rtError err = RT_OK;
+    rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+    rtMessage msg, rsp;
+
+    rtMessage_Create(&msg);
+    rtMessage_SetString(msg, RTM_DISCOVERY_EXPRESSION, object);
+
+    err = rtConnection_SendRequest(g_connection, msg, RTM_DISCOVER_OBJECT_ELEMENTS, &rsp, TIMEOUT_VALUE_FIRE_AND_FORGET);
+
+    rtMessage_Release(msg);
+    msg = rsp;
+
+    if(RT_OK == err)
+    {
+        int32_t size, length, i;
+        const char * value = NULL;
+
+        rtMessage_GetInt32(msg, RTM_DISCOVERY_COUNT, &size);
+        rtMessage_GetArrayLength(msg, RTM_DISCOVERY_ITEMS, &length);
+
+        if(size != length)
+        {
+            rtLog_Error("rbus_GetElementsAddedByObject size missmatch\n");
+        }
+
+        char **array_ptr = (char **)malloc(size * sizeof(char *));
+        *count = size;
+        if (NULL != array_ptr)
+        {
+            *elements = array_ptr;
+            memset(array_ptr, 0, (length * sizeof(char *)));
+            for (i = 0; i < length; i++)
+            {
+                if ((RT_OK != rtMessage_GetStringItem(msg, RTM_DISCOVERY_ITEMS, i, &value)) || (NULL == (array_ptr[i] = strndup(value, MAX_OBJECT_NAME_LENGTH))))
+                {
+                    for (int j = 0; j < i; j++)
+                        free(array_ptr[j]);
+                    free(array_ptr);
+                    rtLog_Error("Read/Memory allocation failure");
+                    ret = RTMESSAGE_BUS_ERROR_GENERAL;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            rtLog_Error("Memory allocation failure");
+            ret = RTMESSAGE_BUS_ERROR_INSUFFICIENT_MEMORY;
+        }
+
+        rtMessage_Release(msg);
+
+        ret = RTMESSAGE_BUS_SUCCESS;
+    }
+    else
+    {
+        ret = RTMESSAGE_BUS_ERROR_GENERAL;
+    }
+
+    return ret;
+}
+
+rbus_error_t rbus_discoverElementObjects(const char* elements, int * count, char *** objects)
+{
+    rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+    rtError err = RT_OK;
+    rtMessage msg, rsp;
+
+    rtMessage_Create(&msg);
+    if(NULL != elements)
+    {
+        rtMessage_SetInt32(msg, RTM_DISCOVERY_COUNT, 1);
+        rtMessage_AddString(msg, RTM_DISCOVERY_ITEMS, elements);
+    }
+    else
+    {
+        rtLog_Error("Null entries in element list.");
+        rtMessage_Release(msg);
+        return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+    }
+
+    err = rtConnection_SendRequest(g_connection, msg, RTM_DISCOVER_ELEMENT_OBJECTS, &rsp, TIMEOUT_VALUE_FIRE_AND_FORGET);
+
+    rtMessage_Release(msg);
+    msg = rsp;
+
+    if(RT_OK == err)
+    {
+        int result;
+        const char * value = NULL;
+
+        if((RT_OK == rtMessage_GetInt32(msg, RTM_DISCOVERY_RESULT, &result)) && (RT_OK == result))
+        {
+            int num_elements = 0;
+            rtMessage_GetInt32(msg, RTM_DISCOVERY_COUNT, &num_elements);
+            *count = num_elements;
+
+            char **array_ptr = (char **)malloc(num_elements * sizeof(char *));
             if (NULL != array_ptr)
             {
                 *objects = array_ptr;
-                memset(array_ptr, 0, (len * sizeof(char *)));
-                for (int i = 0; i < len; i++)
+                memset(array_ptr, 0, (num_elements * sizeof(char *)));
+                for (int i = 0; i < num_elements; i++)
                 {
-                    if ((RT_OK != rbus_PopString(in, &value)) || (NULL == (array_ptr[i] = strndup(value, MAX_OBJECT_NAME_LENGTH))))
+                    if ((RT_OK != rtMessage_GetStringItem(msg, RTM_DISCOVERY_ITEMS, i, &value)) || (NULL == (array_ptr[i] = strndup(value, MAX_OBJECT_NAME_LENGTH))))
                     {
                         for (int j = 0; j < i; j++)
                             free(array_ptr[j]);
@@ -1601,14 +1713,81 @@ rbus_error_t rbus_findMatchingObjects(const char* elements[], const int len, cha
             }
         }
         else
+        {
             ret = RTMESSAGE_BUS_ERROR_GENERAL;
-        rtMessage_Release(in);
+        }
+        rtMessage_Release(msg);
     }
     else
+    {
         ret = RTMESSAGE_BUS_ERROR_MALFORMED_RESPONSE;
-    rtMessage_Release(out);
+    }
+    
     return ret;    
 }
+
+rbus_error_t rbus_discoverRegisteredComponents(int * count, char *** components)
+{
+    rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+    rtError err = RT_OK;
+    rtMessage msg;
+    rtMessage out;
+    rtMessage_Create(&out);
+    rtMessage_SetInt32(out, "dummy", 0);
+    
+    err = rtConnection_SendRequest(g_connection, out, RTM_DISCOVER_REGISTERED_COMPONENTS, &msg, TIMEOUT_VALUE_FIRE_AND_FORGET);
+
+    if(RT_OK == err)
+    {
+        int32_t size, length, i;
+        const char * value = NULL;
+
+        rtMessage_GetInt32(msg, RTM_DISCOVERY_COUNT, &size);
+        rtMessage_GetArrayLength(msg, RTM_DISCOVERY_ITEMS, &length);
+
+        if(size != length)
+        {
+            rtLog_Error("rbus_registeredComponents size missmatch\n");
+        }
+
+        char **array_ptr = (char **)malloc(size * sizeof(char *));
+        *count = size;
+        if (NULL != array_ptr)
+        {
+            *components = array_ptr;
+            memset(array_ptr, 0, (length * sizeof(char *)));
+            for (i = 0; i < length; i++)
+            {
+                if ((RT_OK != rtMessage_GetStringItem(msg, RTM_DISCOVERY_ITEMS, i, &value)) || (NULL == (array_ptr[i] = strndup(value, MAX_OBJECT_NAME_LENGTH))))
+                {
+                    for (int j = 0; j < i; j++)
+                        free(array_ptr[j]);
+                    free(array_ptr);
+                    rtLog_Error("Read/Memory allocation failure");
+                    ret = RTMESSAGE_BUS_ERROR_GENERAL;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            rtLog_Error("Memory allocation failure");
+            ret = RTMESSAGE_BUS_ERROR_INSUFFICIENT_MEMORY;
+        }
+
+        rtMessage_Release(msg);
+
+        ret = RTMESSAGE_BUS_SUCCESS;
+    }
+    else
+    {
+        rtLog_Error("Failed with error code %d", err);
+        ret = RTMESSAGE_BUS_ERROR_GENERAL;
+    }
+    
+    return ret;
+}
+
 rbus_error_t subscribeOnevent(const char * path, rbus_callback_t callback);
 rbus_error_t unsubscribeOnevent(const char * path);
 
@@ -1641,9 +1820,11 @@ rbuscore_bus_status_t rbuscore_checkBusStatus(void)
 #endif /* RBUS_ALWAYS_ON */
 }
 
-rbus_error_t rbus_sendResponse(const rtMessageHeader* hdr, rtMessage response)
+rbus_error_t rbus_sendResponse(const rtMessageHeader* hdr, rbusMessage response)
 {
     rtError err = RT_OK;
+    uint8_t* data;
+    uint32_t dataLength;
 
     if(rtMessageHeader_IsRequest(hdr))
     {
@@ -1651,15 +1832,18 @@ rbus_error_t rbus_sendResponse(const rtMessageHeader* hdr, rtMessage response)
         if(NULL == response)
         {
             /* App declined to issue a response. Make one up ourselves. */
-            rtMessage_Create(&response);
-            rtMessage_SetInt32(response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_ERROR_UNSUPPORTED_METHOD);
+            rbusMessage_Init(&response);
+            rbusMessage_SetInt32(response, RTMESSAGE_BUS_ERROR_UNSUPPORTED_METHOD);
         }
         set_message_method(response, METHOD_RESPONSE);
-        if((err= rtConnection_SendResponse(g_connection, hdr, response, TIMEOUT_VALUE_FIRE_AND_FORGET)) != RT_OK)
+
+        rbusMessage_ToBytes(response, &data, &dataLength);
+
+        if((err= rtConnection_SendBinaryResponse(g_connection, hdr, data, dataLength, TIMEOUT_VALUE_FIRE_AND_FORGET)) != RT_OK)
         {
             rtLog_Error("Failed to send async response. Error code: 0x%x", err);
         }
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     }
     return err == RT_OK ? RTMESSAGE_BUS_SUCCESS : RTMESSAGE_BUS_ERROR_GENERAL;
 }

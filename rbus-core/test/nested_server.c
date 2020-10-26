@@ -21,26 +21,26 @@
 #include <unistd.h>
 #include <string.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 #include "rtLog.h"
 
 static char data[100] = "init init init";
 static const char * object_name;
 static const char * nested_object_name;
-static int handle_get(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int handle_get(const char * destination, const char * method, rbusMessage message, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) message;
     (void) hdr;
     printf("Handling %s call for %s\n", method, destination);
-    rtMessage_Create(response);
-    rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
-    rbus_SetString(*response, MESSAGE_FIELD_PAYLOAD, data);
+    rbusMessage_Init(response);
+    rbusMessage_SetInt32(*response, RTMESSAGE_BUS_SUCCESS);
+    rbusMessage_SetString(*response, data);
 
     if(0 == strncmp(object_name, destination, strlen(object_name)))
     {
         /* Make the nested call */
-        rtMessage nestedResponse;
+        rbusMessage nestedResponse;
         if(RTMESSAGE_BUS_SUCCESS != rbus_invokeRemoteMethod(nested_object_name, METHOD_GETPARAMETERVALUES,
                     NULL, 1000, &nestedResponse))
         {
@@ -49,7 +49,7 @@ static int handle_get(const char * destination, const char * method, rtMessage m
         else
         {
             printf("Nested call returned.\n");
-            rtMessage_Release(nestedResponse);
+            rbusMessage_Release(nestedResponse);
         }
     }
     printf("Exiting %s call for %s\n", method, destination);
@@ -57,17 +57,17 @@ static int handle_get(const char * destination, const char * method, rtMessage m
 }
 
 
-static void handle_unknown(const char * destination, const char * method, rtMessage message, rtMessage *response, const rtMessageHeader* hdr)
+static void handle_unknown(const char * destination, const char * method, rbusMessage message, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) message;
     (void) destination;
     (void) method;
     (void) hdr;
-    rtMessage_Create(response);
-    rbus_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_ERROR_UNSUPPORTED_METHOD);
+    rbusMessage_Init(response);
+    rbusMessage_SetInt32(*response, RTMESSAGE_BUS_ERROR_UNSUPPORTED_METHOD);
 }
 
-static int callback(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int callback(const char * destination, const char * method, rbusMessage message, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) destination;
@@ -77,7 +77,7 @@ static int callback(const char * destination, const char * method, rtMessage mes
     char* buff = NULL;
     uint32_t buff_length = 0;
 
-    rtMessage_ToString(message, &buff, &buff_length);
+    rbusMessage_ToDebugString(message, &buff, &buff_length);
     printf("%s\n", buff);
     free(buff);
 

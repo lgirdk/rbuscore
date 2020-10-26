@@ -22,7 +22,7 @@
 #include <string.h>
 #include "rbus_core.h"
 #include "bin_header.h"
-#include "rbus_marshalling.h"
+
 #include "rtLog.h"
 
 static char buffer[100];
@@ -37,21 +37,21 @@ static void fill_mystruct()
     mystruct.d = 0xFF;
 }
 
-static int handle_get(const char * destination, const char * method, rtMessage message, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int handle_get(const char * destination, const char * method, rbusMessage message, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) message;
     (void) user_data;
     (void) destination;
     (void) method;
     (void) hdr;
-    rtMessage_Create(response);
-    rtMessage_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
-    if(RT_OK != rbus_AddBinaryData(*response, MESSAGE_FIELD_PAYLOAD, (void *)&mystruct, sizeof(mystruct)))
+    rbusMessage_Init(response);
+    rbusMessage_SetInt32(*response, RTMESSAGE_BUS_SUCCESS);
+    if(RT_OK != rbusMessage_SetBytes(*response, (const uint8_t*)&mystruct, sizeof(mystruct)))
         printf("AddBinaryData failed.\n");
     return 0;
 }
 
-static int handle_set(const char * destination, const char * method, rtMessage request, void * user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int handle_set(const char * destination, const char * method, rbusMessage request, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) destination;
@@ -59,24 +59,24 @@ static int handle_set(const char * destination, const char * method, rtMessage r
     (void) hdr;
     const binstruct_t * ptr;
     unsigned int size = 0;
-    rbus_GetBinaryData(request, MESSAGE_FIELD_PAYLOAD, (const void **)&ptr, &size);
+    rbusMessage_GetBytes(request, (const uint8_t**)&ptr, &size);
     mystruct = *ptr;
-    rtMessage_Create(response);
-    rtMessage_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_SUCCESS);
+    rbusMessage_Init(response);
+    rbusMessage_SetInt32(*response, RTMESSAGE_BUS_SUCCESS);
     return 0;
 }
 
-static void handle_unknown(const char * destination, const char * method, rtMessage request, rtMessage *response, const rtMessageHeader* hdr)
+static void handle_unknown(const char * destination, const char * method, rbusMessage request, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) request;
     (void) destination;
     (void) method;
     (void) hdr;
-    rtMessage_Create(response);
-    rtMessage_SetInt32(*response, MESSAGE_FIELD_RESULT, RTMESSAGE_BUS_ERROR_UNSUPPORTED_METHOD);
+    rbusMessage_Init(response);
+    rbusMessage_SetInt32(*response, RTMESSAGE_BUS_ERROR_UNSUPPORTED_METHOD);
 }
 
-static int callback(const char * destination, const char * method, rtMessage message, void *user_data, rtMessage *response, const rtMessageHeader* hdr)
+static int callback(const char * destination, const char * method, rbusMessage message, void *user_data, rbusMessage *response, const rtMessageHeader* hdr)
 {
     (void) user_data;
     (void) hdr;
@@ -84,7 +84,7 @@ static int callback(const char * destination, const char * method, rtMessage mes
     char* buff = NULL;
     uint32_t buff_length = 0;
 
-    rtMessage_ToString(message, &buff, &buff_length);
+    rbusMessage_ToDebugString(message, &buff, &buff_length);
     printf("%s\n", buff);
     free(buff);
 

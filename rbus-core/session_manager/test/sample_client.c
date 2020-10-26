@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 #include "rbus_session_mgr.h"
 #include "rtLog.h"
 
@@ -29,11 +29,11 @@ static int g_current_session_id = 0;
 
 void create_session()
 {
-    rtMessage response;
+    rbusMessage response;
     if(RTMESSAGE_BUS_SUCCESS == rbus_invokeRemoteMethod(RBUS_SMGR_DESTINATION_NAME, RBUS_SMGR_METHOD_REQUEST_SESSION_ID, NULL, 1000, &response))
     {
         int result;
-        if(RT_OK == rbus_GetInt32(response, MESSAGE_FIELD_RESULT, &result))
+        if(RT_OK == rbusMessage_GetInt32(response, &result))
         {
             if(RTMESSAGE_BUS_SUCCESS != result)
             {
@@ -41,7 +41,7 @@ void create_session()
                 return;
             }
         }
-        if(RT_OK == rbus_GetInt32(response, MESSAGE_FIELD_PAYLOAD, &g_current_session_id))
+        if(RT_OK == rbusMessage_GetInt32(response, &g_current_session_id))
         {
             printf("Got new session id %d\n", g_current_session_id);
         }
@@ -54,11 +54,11 @@ void create_session()
 
 void print_current_session_id()
 {
-    rtMessage response;
+    rbusMessage response;
     if(RTMESSAGE_BUS_SUCCESS == rbus_invokeRemoteMethod(RBUS_SMGR_DESTINATION_NAME, RBUS_SMGR_METHOD_GET_CURRENT_SESSION_ID, NULL, 1000, &response))
     {
         int result;
-        if(RT_OK == rbus_GetInt32(response, MESSAGE_FIELD_RESULT, &result))
+        if(RT_OK == rbusMessage_GetInt32(response, &result))
         {
             if(RTMESSAGE_BUS_SUCCESS != result)
             {
@@ -66,7 +66,7 @@ void print_current_session_id()
                 return;
             }
         }
-        if(RT_OK == rbus_GetInt32(response, MESSAGE_FIELD_PAYLOAD, &g_current_session_id))
+        if(RT_OK == rbusMessage_GetInt32(response, &g_current_session_id))
         {
             printf("Current session id %d\n", g_current_session_id);
         }
@@ -79,15 +79,15 @@ void print_current_session_id()
 
 void end_session(int session)
 {
-    rtMessage out;
-    rtMessage response;
+    rbusMessage out;
+    rbusMessage response;
 
-    rtMessage_Create(&out);
-    rbus_SetInt32(out, MESSAGE_FIELD_PAYLOAD, session);
+    rbusMessage_Init(&out);
+    rbusMessage_SetInt32(out, session);
     if(RTMESSAGE_BUS_SUCCESS == rbus_invokeRemoteMethod(RBUS_SMGR_DESTINATION_NAME, RBUS_SMGR_METHOD_END_SESSION, out, 1000, &response))
     {
         int result;
-        if(RT_OK == rbus_GetInt32(response, MESSAGE_FIELD_RESULT, &result))
+        if(RT_OK == rbusMessage_GetInt32(response, &result))
         {
             if(RTMESSAGE_BUS_SUCCESS != result)
             {

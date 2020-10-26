@@ -22,6 +22,13 @@ include_directories(
 
 if (BUILD_RBUS_SAMPLE_APPS)
 
+if (BUILD_FOR_DESKTOP)
+	include_directories(
+        ${CMAKE_SOURCE_DIR}/msgpack/src/msgpack/include)
+	link_directories(
+		${CMAKE_SOURCE_DIR}/msgpack/build)
+endif (BUILD_FOR_DESKTOP)
+
 add_executable(sample_server sample_server.c)
 add_dependencies(sample_server rbus-core)
 target_link_libraries(sample_server rbus-core)

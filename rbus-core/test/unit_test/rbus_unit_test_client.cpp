@@ -26,7 +26,7 @@ Test Case : Testing rbus communications from client end
 #include <stdbool.h>
 extern "C" {
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 }
 #include "gtest_app.h"
 
@@ -100,13 +100,13 @@ static bool CALL_RBUS_PULL_OBJECT(char* expected_data, char* server_obj)
 {
     bool result = false;
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    rtMessage response;
+    rbusMessage response;
     if((err = rbus_pullObj(server_obj, 1000, &response)) == RTMESSAGE_BUS_SUCCESS)
     {
         const char* buff = NULL;
-        rbus_GetString(response, MESSAGE_FIELD_PAYLOAD, &buff);
+        rbusMessage_GetString(response, &buff);
         EXPECT_STREQ(buff, expected_data) << "rbus_pullObj failed to procure the server's initial string -init init init- ";
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
         result = true;
     }
     else
@@ -120,9 +120,9 @@ static bool CALL_RBUS_PULL_OBJECT(char* expected_data, char* server_obj)
 static bool CALL_RBUS_PUSH_OBJECT(char* data, char* server_obj)
 {
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    rtMessage setter;
-    rtMessage_Create(&setter);
-    rbus_SetString(setter, MESSAGE_FIELD_PAYLOAD, data);
+    rbusMessage setter;
+    rbusMessage_Init(&setter);
+    rbusMessage_SetString(setter, data);
     err = rbus_pushObj(server_obj, setter, 1000);
     EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_pushObj failed";
     return true;
@@ -131,9 +131,9 @@ static bool CALL_RBUS_PUSH_OBJECT(char* data, char* server_obj)
 static bool CALL_RBUS_PUSH_OBJECT_NO_ACK(char* data, char* server_obj)
 {
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    rtMessage setter;
-    rtMessage_Create(&setter);
-    rbus_SetString(setter, MESSAGE_FIELD_PAYLOAD, data);
+    rbusMessage setter;
+    rbusMessage_Init(&setter);
+    rbusMessage_SetString(setter, data);
     err = rbus_pushObjNoAck(server_obj, setter);
     EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_pushObj failed";
     return true;
@@ -142,18 +142,18 @@ static bool CALL_RBUS_PUSH_OBJECT_NO_ACK(char* data, char* server_obj)
 static bool CALL_RBUS_PUSH_OBJECT_DETAILED(char* server_obj, test_struct_t ip_data)
 {
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    rtMessage setter;
-    rtMessage response;
-    rtMessage_Create(&setter);
-    rbus_SetString(setter, "name", ip_data.name);
+    rbusMessage setter;
+    rbusMessage response;
+    rbusMessage_Init(&setter);
+    rbusMessage_SetString(setter, ip_data.name);
     //printf("Set name : %s \n",ip_data.name);
-    rbus_SetInt32(setter, "age", ip_data.age);
+    rbusMessage_SetInt32(setter, ip_data.age);
     //printf("Set age : %d  \n", ip_data.age);
     err = rbus_invokeRemoteMethod(server_obj, METHOD_SETPARAMETERATTRIBUTES, setter, 1000, &response);
     EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "RPC invocation failed";
 
     if(RTMESSAGE_BUS_SUCCESS == err)
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
     return true;
 }
 
@@ -162,15 +162,15 @@ static bool CALL_RBUS_PULL_OBJECT_DETAILED(char* server_obj, test_struct_t expec
     bool result = false;
     int age = 0;
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    rtMessage response;
+    rbusMessage response;
     if((err = rbus_invokeRemoteMethod(server_obj, METHOD_GETPARAMETERATTRIBUTES, NULL, 1000, &response)) == RTMESSAGE_BUS_SUCCESS)
     {
         const char* buff = NULL;
-        rbus_GetString(response, "name", &buff);
-        rbus_GetInt32(response, "age", &age);
+        rbusMessage_GetString(response, &buff);
+        rbusMessage_GetInt32(response, &age);
         EXPECT_STREQ(buff, expected_op.name) << "METHOD_GETPARAMETERATTRIBUTES failed to procure expected name ";
         EXPECT_EQ(age, expected_op.age) << "METHOD_GETPARAMETERATTRIBUTES failed to procure expected age ";
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
         result = true;
     }
     else

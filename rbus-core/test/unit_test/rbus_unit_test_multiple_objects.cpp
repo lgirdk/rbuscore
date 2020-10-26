@@ -26,7 +26,7 @@ Test Case : Testing rbus communications from client end
 #include <signal.h>
 extern "C" {
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 }
 #include "gtest_app.h"
 #include "rbus_test_util.h"
@@ -155,19 +155,19 @@ static void CREATE_RBUS_SERVER_ELEMENTS(int handle, int element_count)
     return;
 }
 
-static bool RBUS_PULL_OBJECT1(char* expected_data, char* server_obj, rbus_error_t expected_err)
+static bool RBUS_PULL_OBJECT1(const char* expected_data, char* server_obj, rbus_error_t expected_err)
 {
     bool result = false;
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    rtMessage response;
+    rbusMessage response;
     //printf("pulling data from : %s \n", server_obj);
     if((err = rbus_pullObj(server_obj, 1000, &response)) == RTMESSAGE_BUS_SUCCESS)
     {
         const char* buff = NULL;
-        rbus_GetString(response, MESSAGE_FIELD_PAYLOAD, &buff);
+        rbusMessage_GetString(response, &buff);
         printf("%s: rbus pull returned : %s \n", __FUNCTION__, buff);
         EXPECT_STREQ(buff, expected_data) << "rbus_pullObj failed to procure expected string";
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
         result = true;
     }
     else
@@ -181,9 +181,9 @@ static bool RBUS_PULL_OBJECT1(char* expected_data, char* server_obj, rbus_error_
 static bool RBUS_PUSH_OBJECT1(char* data, char* server_obj, rbus_error_t expected_err)
 {
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
-    rtMessage setter;
-    rtMessage_Create(&setter);
-    rbus_SetString(setter, MESSAGE_FIELD_PAYLOAD, data);
+    rbusMessage setter;
+    rbusMessage_Init(&setter);
+    rbusMessage_SetString(setter, data);
     //printf("pushing data %s to : %s \n", data, server_obj);
     err = rbus_pushObj(server_obj, setter, 1000);
     EXPECT_EQ(err, expected_err) << "rbus_pushObj failed";

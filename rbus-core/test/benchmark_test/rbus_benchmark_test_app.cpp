@@ -22,7 +22,7 @@
 #include <benchmark/benchmark.h>
 extern "C" {
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 }
 #include "rbus_test_util.h"
 
@@ -213,8 +213,8 @@ static void BM_PushObject(benchmark::State& state) {
 
        conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
 
-        rtMessage_Create(&setter);
-        rbus_SetString(setter, MESSAGE_FIELD_PAYLOAD, test_string);
+        rbusMessage_Init(&setter);
+        rbusMessage_SetString(setter, test_string);
         for (auto _ : state)
         {
             err = rbus_pushObj(server_obj, setter, 1000);
@@ -259,8 +259,8 @@ static void BM_PullObject(benchmark::State& state) {
 
        conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
 
-        rtMessage_Create(&setter);
-        rbus_SetString(setter, MESSAGE_FIELD_PAYLOAD, test_string);
+        rbusMessage_Init(&setter);
+        rbusMessage_SetString(setter, test_string);
         err = rbus_pushObj(server_obj, setter, 1000);
         if(RTMESSAGE_BUS_SUCCESS != err)
             printf("rbus_pushObj failed!!");
@@ -273,7 +273,7 @@ static void BM_PullObject(benchmark::State& state) {
         if(err == RTMESSAGE_BUS_SUCCESS)
         {
             const char* buff = NULL;
-            rbus_GetString(response, MESSAGE_FIELD_PAYLOAD, &buff);
+            rbusMessage_GetString(response, &buff);
             if(NULL != buff)
             {
                 if (strncmp (buff,test_string,strlen(test_string)) == 0)
@@ -289,7 +289,7 @@ static void BM_PullObject(benchmark::State& state) {
         else
             printf("rbus_pullObj failed!!");
 
-        rtMessage_Release(response);
+        rbusMessage_Release(response);
 
         if(conn_status)
             CALL_RBUS_CLOSE_BROKER_CONNECTION();
@@ -327,15 +327,15 @@ static void BM_InvokeRemoteMethodSet (benchmark::State& state) {
 
        conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
 
-        rtMessage_Create(&setter);
-        rbus_SetString(setter, MESSAGE_FIELD_PAYLOAD, test_string);
+        rbusMessage_Init(&setter);
+        rbusMessage_SetString(setter, test_string);
         for (auto _ : state)
         {
             err = rbus_invokeRemoteMethod(server_obj, METHOD_SETPARAMETERVALUES, setter, 1000, &response);
         }
         if(NULL != response)
         {
-            rtMessage_Release(response);
+            rbusMessage_Release(response);
             response = NULL;
         }
 
@@ -378,15 +378,15 @@ static void BM_InvokeRemoteMethodGet (benchmark::State& state) {
 
        conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
 
-        rtMessage_Create(&setter);
-        rbus_SetString(setter, MESSAGE_FIELD_PAYLOAD, test_string);
+        rbusMessage_Init(&setter);
+        rbusMessage_SetString(setter, test_string);
         err = rbus_invokeRemoteMethod(server_obj, METHOD_SETPARAMETERVALUES, setter, 1000, &response);
         if(RTMESSAGE_BUS_SUCCESS != err)
             printf("rbus_invokeRemoteMethod failed!!");
 
         if(NULL != response)
         {
-            rtMessage_Release(response);
+            rbusMessage_Release(response);
             response = NULL;
         }
 
@@ -398,7 +398,7 @@ static void BM_InvokeRemoteMethodGet (benchmark::State& state) {
         if(err == RTMESSAGE_BUS_SUCCESS)
         {
             const char* buff = NULL;
-            rbus_GetString(response, MESSAGE_FIELD_PAYLOAD, &buff);
+            rbusMessage_GetString(response, &buff);
             if(NULL != buff)
             {
                 if (strncmp (buff,test_string,strlen(test_string)) == 0)
@@ -412,7 +412,7 @@ static void BM_InvokeRemoteMethodGet (benchmark::State& state) {
 
         if(NULL != response)
         {
-            rtMessage_Release(response);
+            rbusMessage_Release(response);
             response = NULL;
         }
         if(conn_status)

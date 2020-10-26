@@ -26,7 +26,7 @@ Test server for unit test client testing
 #include <string.h>
 #include <stdbool.h>
 #include "rbus_core.h"
-#include "rbus_marshalling.h"
+
 #include "rbus_test_util.h"
 
 static char buffer[100];
@@ -73,6 +73,7 @@ int main(int argc, char *argv[])
                                           {METHOD_SETPARAMETERATTRIBUTES, NULL, handle_setAttributes2}, {METHOD_GETPARAMETERATTRIBUTES, NULL, handle_getAttributes2}};
     rbus_registerMethodTable(buffer2, table2, 4); 
 
+    fflush(stdout);
 
     pause();
 
