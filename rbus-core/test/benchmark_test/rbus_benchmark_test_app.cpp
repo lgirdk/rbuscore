@@ -205,7 +205,7 @@ static void BM_PushObject(benchmark::State& state) {
     else if (pid > 0)
     {
         sleep(2);
-        rtMessage setter;
+        rbusMessage setter;
         char server_obj[] = "test_server_2.obj1";
         char test_string[] = "rbus benchmark test 1";
         char client_name[] = "TEST_CLIENT_1";
@@ -250,8 +250,8 @@ static void BM_PullObject(benchmark::State& state) {
     else if (pid > 0)
     {
         sleep(2);
-        rtMessage setter;
-        rtMessage response;
+        rbusMessage setter;
+        rbusMessage response;
         char server_obj[] = "test_server_2.obj1";
         char test_string[] = "rbus benchmark test 1";
         char client_name[] = "TEST_CLIENT_1";
@@ -318,12 +318,12 @@ static void BM_InvokeRemoteMethodSet (benchmark::State& state) {
     else if (pid > 0)
     {
         sleep(2);
-        rtMessage setter;
+        rbusMessage setter;
         char server_obj[] = "test_server_2.obj1";
         char test_string[] = "rbus benchmark test 1";
         char client_name[] = "TEST_CLIENT_1";
         bool conn_status = false;
-        rtMessage response;
+        rbusMessage response;
 
        conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
 
@@ -369,12 +369,12 @@ static void BM_InvokeRemoteMethodGet (benchmark::State& state) {
     else if (pid > 0)
     {
         sleep(2);
-        rtMessage setter;
+        rbusMessage setter;
         char server_obj[] = "test_server_2.obj1";
         char test_string[] = "rbus benchmark test 1";
         char client_name[] = "TEST_CLIENT_1";
         bool conn_status = false;
-        rtMessage response;
+        rbusMessage response;
 
        conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
 
