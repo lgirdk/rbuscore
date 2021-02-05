@@ -909,7 +909,7 @@ rtRouted_RegisterNewClient(int fd, struct sockaddr_storage* remote_endpoint)
   snprintf(new_client->ident, RTMSG_ADDR_MAX, "%s:%d/%d", remote_address, remote_port, fd);
   rtVector_PushBack(clients, new_client);
 
-  rtLog_Info("new client:%s", new_client->ident);
+  rtLog_Debug("new client:%s", new_client->ident);
 }
 
 static void
