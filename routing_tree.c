@@ -78,7 +78,7 @@ void rtree_initialize()
 }
 void rtree_get_stats()
 {
-    rtLog_Info("<< rtree statistics: %d root nodes, %d dynamic nodes. >>", g_num_root_nodes, g_num_dynamic_nodes);
+    rtLog_Debug("<< rtree statistics: %d root nodes, %d dynamic nodes. >>", g_num_root_nodes, g_num_dynamic_nodes);
 }
 
 static int add_root_node(char * key, void * optional_value, node_t ** created_node)
