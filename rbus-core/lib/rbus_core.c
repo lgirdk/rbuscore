@@ -509,7 +509,7 @@ rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char 
 	}
 	if(NULL != g_connection)
 	{
-		rtLog_Error("A connection already exists. Cannot open a new one.");
+		rtLog_Info("A connection already exists. Cannot open a new one.");
 		return RTMESSAGE_BUS_ERROR_INVALID_STATE;
 	}
 	perform_init();
