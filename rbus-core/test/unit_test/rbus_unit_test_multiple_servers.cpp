@@ -110,10 +110,18 @@ static void CREATE_RBUS_SERVER_INSTANCE2(int handle, int obj_count)
     return;
 }
 
+static std::string integer2string(int num)
+{
+    char array_num[32] = {0};
+    snprintf(array_num, sizeof(array_num), "%d",num);
+    return std::string(array_num);
+}
+
 static void CREATE_RBUS_SERVER_INSTANCE3(const char * app_prefix, int num)
 {
     std::string server_name("");
-    server_name += app_prefix + std::to_string(num);
+    std::string num_string = integer2string(num);
+    server_name += app_prefix + num_string;
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
 
     printf("*** CREATING SERVER : %s \n", server_name.c_str());
@@ -124,12 +132,12 @@ static void CREATE_RBUS_SERVER_INSTANCE3(const char * app_prefix, int num)
     err = rbus_openBrokerConnection(server_name.c_str());
     EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_openBrokerConnection2() failed";
     
-    std::string obj_name = std::string(app_prefix) + std::to_string(num) + ".obj";
+    std::string obj_name = std::string(app_prefix) + num_string + ".obj";
     err = rbus_registerObj(obj_name.c_str(), callback, NULL);
     EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_registerObj failed";
-    err = rbus_addElement(obj_name.c_str(), std::string(app_prefix + std::to_string(num) + std::string(".element")).c_str());
+    err = rbus_addElement(obj_name.c_str(), std::string(app_prefix + num_string + std::string(".element")).c_str());
     EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_addElement failed";
-    rbus_addElement(obj_name.c_str(), std::string("common.element." + std::to_string(num)).c_str());
+    rbus_addElement(obj_name.c_str(), std::string("common.element." + num_string).c_str());
     return;
 }
 

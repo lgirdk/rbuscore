@@ -19,11 +19,11 @@
 #ifndef __RBUS_CORE_H__
 #define __RBUS_CORE_H__
 
-#include <rtmessage/rtMessageHeader.h>
-#include <rtmessage/rtConnection.h>
+#include <rtMessageHeader.h>
+#include <rtConnection.h>
 #include "rbus_types.h"
 #include "rbus_message.h"
-#include <rtmessage/rtm_discovery_api.h>
+#include <rtm_discovery_api.h>
 
 #define MAX_OBJECT_NAME_LENGTH RTMSG_HEADER_MAX_TOPIC_LENGTH
 #define MAX_METHOD_NAME_LENGTH 64
@@ -39,6 +39,7 @@ typedef int (*rbus_async_callback_t)(rbusMessage message, void * user_data);
 typedef int (*rbus_event_callback_t)(const char * object_name,  const char * event_name, rbusMessage message, void * user_data);
 typedef int (*rbus_timed_update_event_callback_t)(rbusMessage *message);
 typedef int (*rbus_event_subscribe_callback_t)(const char * object_name,  const char * event_name, const char * listener, int added, const rbusMessage filter, void * user_data);
+typedef void (*rbus_client_disconnect_callback_t)(const char * name);
 
 typedef struct
 {
@@ -127,10 +128,10 @@ rbus_error_t rbus_registerTimedUpdateEventCallback(const char* object_name,  con
 
 /* Subscribe to 'event_name' events from 'object_name' object. If the object supports only one event, event_name can be NULL. If the event_name is an alias for the object, then object_name can be NULL. The installed callback will be invoked every time 
  * a matching event is received. */
-rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage filter, void * user_data);
+rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage filter, void * user_data, int* providerError);
 
 /* Unsubscribe from receiving 'event_name' events from 'object_name' object. If the object supports only one event, event_name can be NULL. */
-rbus_error_t rbus_unsubscribeFromEvent(const char * object_name,  const char * event_name);
+rbus_error_t rbus_unsubscribeFromEvent(const char * object_name,  const char * event_name, const rbusMessage filter);
 
 /* The following 2 methods were added to allow rbus 2.0 to handle the event subscriber list directly.
    These replace the use of rbus_registerEvent/rbus_publishEvent.
@@ -139,6 +140,11 @@ rbus_error_t rbus_unsubscribeFromEvent(const char * object_name,  const char * e
 /* Register a callback which will be called when any subscriber subscribes to any event.
    This disables the rbuscore built-in server-side event subscription handling. */
 rbus_error_t rbus_registerSubscribeHandler(const char* object_name, rbus_event_subscribe_callback_t callback, void * user_data);
+
+/* Register a callback which will be called when any client on the bus, disconnects */
+rbus_error_t rbus_registerClientDisconnectHandler(rbus_client_disconnect_callback_t callback);
+rbus_error_t rbus_unregisterClientDisconnectHandler();
+
 /* Send an event message directly to a specific subscribe(e.g. listener) */
 rbus_error_t rbus_publishSubscriberEvent(const char* object_name,  const char * event_name, const char* listener, rbusMessage out);
 

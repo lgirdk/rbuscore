@@ -26,22 +26,23 @@ include_directories(
     ../include)
 
 add_library(
-    rbus-core	
+    rbus-core
     SHARED
     rbus_core.c
     rbus_message.c)
 
+include_directories(${RTMESSAGE_INCLUDE_DIRS})
+
 if (BUILD_FOR_DESKTOP)
-	add_dependencies(rbus-core msgpack)
+    add_dependencies(rbus-core msgpack)
 endif (BUILD_FOR_DESKTOP)
 
 target_link_libraries(
-    rbus-core	
+    rbus-core
     ${RTMESSAGE_LIBRARIES}
-    ${CJSON_LIBRARIES}
     ${RDKLOGGER_LIBRARIES}
-    -lpthread
-    -lmsgpackc)
+    ${MSGPACK_LIBRARIES}
+    -lpthread)
 
 set_target_properties(rbus-core
     PROPERTIES SOVERSION "0"

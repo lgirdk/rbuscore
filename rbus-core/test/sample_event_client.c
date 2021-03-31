@@ -57,19 +57,19 @@ int main(int argc, char *argv[])
 
     printf("Registering event callback.\n");
 
-    rbus_subscribeToEvent("non_object", "event_2", &event_callback, NULL, NULL); //Negative test case.
-    rbus_subscribeToEvent("non_object", NULL, &event_callback, NULL, NULL); //Negative test case.
-    rbus_subscribeToEvent(OBJ1_NAME, "event3", &event_callback, NULL, NULL); //Negative test case.
-    rbus_subscribeToEvent(OBJ1_NAME, "event1", &event_callback, NULL, NULL);
-    rbus_subscribeToEvent(OBJ1_NAME, "event1", &event_callback, NULL, NULL); //Negative test case.
-    rbus_subscribeToEvent(OBJ1_NAME, "event2", &event_callback, NULL, NULL);
-    rbus_subscribeToEvent(OBJ2_NAME, NULL, &event_callback, NULL, NULL);
+    rbus_subscribeToEvent("non_object", "event_2", &event_callback, NULL, NULL, NULL); //Negative test case.
+    rbus_subscribeToEvent("non_object", NULL, &event_callback, NULL, NULL, NULL); //Negative test case.
+    rbus_subscribeToEvent(OBJ1_NAME, "event3", &event_callback, NULL, NULL, NULL); //Negative test case.
+    rbus_subscribeToEvent(OBJ1_NAME, "event1", &event_callback, NULL, NULL, NULL);
+    rbus_subscribeToEvent(OBJ1_NAME, "event1", &event_callback, NULL, NULL, NULL); //Negative test case.
+    rbus_subscribeToEvent(OBJ1_NAME, "event2", &event_callback, NULL, NULL, NULL);
+    rbus_subscribeToEvent(OBJ2_NAME, NULL, &event_callback, NULL, NULL, NULL);
 
     //support rbus events being elements
-    rbus_subscribeToEvent(NULL, "event4", &event_callback, NULL, NULL);
+    rbus_subscribeToEvent(NULL, "event4", &event_callback, NULL, NULL, NULL);
 
     sleep(10);
-    rbus_unsubscribeFromEvent(OBJ1_NAME, "event2");
+    rbus_unsubscribeFromEvent(OBJ1_NAME, "event2", NULL);
     sleep(1);
 #if 1
     /*Pull the object from remote end.*/
