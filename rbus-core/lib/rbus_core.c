@@ -187,6 +187,8 @@ void server_object_destroy(void* p)
 
 rbus_error_t server_object_subscription_handler(server_object_t obj, const char * event, char const* subscriber, int added, rbusMessage filter)
 {
+    rbus_error_t ret;
+
     if((NULL == event) || (NULL == subscriber) ||
        (MAX_SUBSCRIBER_NAME_LENGTH <= strlen(subscriber)) || 
        (MAX_EVENT_NAME_LENGTH <= strlen(event)))
@@ -197,7 +199,9 @@ rbus_error_t server_object_subscription_handler(server_object_t obj, const char 
     
     if(obj->subscribe_handler_override)
     {
-        return (rbus_error_t)obj->subscribe_handler_override(obj->name, event, subscriber, added, filter, obj->subscribe_handler_data);
+        ret = (rbus_error_t)obj->subscribe_handler_override(obj->name, event, subscriber, added, filter, obj->subscribe_handler_data);
+        if(ret != RTMESSAGE_BUS_SUBSCRIBE_NOT_HANDLED)
+            return ret;
     }
 
     server_event_t server_event = rtVector_Find(obj->subscriptions, event, server_event_compare);
@@ -403,7 +407,6 @@ static void dispatch_method_call(rbusMessage msg, const rtMessageHeader *hdr, se
     rbusMessage_BeginMetaSectionRead(msg);
     err = rbusMessage_GetString(msg, &method_name);
     rbusMessage_EndMetaSectionRead(msg);
-    
     lock();
     if( rtVector_Size(obj->methods) > 0 && RT_OK == err)
     {
