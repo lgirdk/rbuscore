@@ -34,6 +34,12 @@ extern "C" {
 
 #define MAX_SERVER_NAME 20
 
+#define MAX_BROKER_ADDRESS_LEN 256
+
+#define FILEPATH "/etc/rbus_client.conf"
+
+static char g_broker_address[MAX_BROKER_ADDRESS_LEN] = "unix:///tmp/rtrouted";
+
 static bool RBUS_OPEN_BROKER_CONNECTION(char* server_name, rbus_error_t expected_status)
 {
     bool result = false;
@@ -142,6 +148,53 @@ static void CREATE_RBUS_SERVER_REG_OBJECT(int handle)
     return;
 }
 
+static void get_broker_address(void)
+{
+#if BUILD_FOR_DESKTOP
+    return;
+#else
+    FILE* fconfig = fopen(FILEPATH, "r");
+    if(fconfig)
+    {
+        size_t len;
+        char buff[MAX_BROKER_ADDRESS_LEN] = {0};
+
+        /*locate the first word(block of printable text)*/
+        while(fgets(buff, MAX_BROKER_ADDRESS_LEN, fconfig))
+        {
+            len = strlen(buff);
+            if(len > 0)
+            {
+                size_t idx1 = 0;
+
+                /*move past any leading space*/
+                while(idx1 < len && isspace(buff[idx1]))
+                {
+                    idx1++;
+                }
+
+                if(idx1 < len)
+                {
+                    size_t idx2 = idx1+1;
+
+                    /*move to end of word*/
+                    while(idx2 < len && !isspace(buff[idx2]))
+                        idx2++;
+
+                    if(idx2-idx1 > 0)
+                    {
+                        buff[idx2] = 0;
+                        strcpy(g_broker_address, &buff[idx1]);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    fclose(fconfig);
+#endif
+}
+
 class TestServer : public ::testing::Test{
 
 protected:
@@ -210,9 +263,9 @@ TEST_F(TestServer, rbus_openBrokerConnection_test3)
 TEST_F(TestServer, rbus_openBrokerConnection2_test1)
 {
     char server_name[20] = "test_server_";
-    const char * broker_address = "unix:///tmp/rtrouted";
 
-    if(RBUS_OPEN_BROKER_CONNECTION2(server_name,broker_address,RTMESSAGE_BUS_SUCCESS))
+    get_broker_address();
+    if(RBUS_OPEN_BROKER_CONNECTION2(server_name,g_broker_address,RTMESSAGE_BUS_SUCCESS))
         RBUS_CLOSE_BROKER_CONNECTION(RTMESSAGE_BUS_SUCCESS);
     return;
 }
@@ -239,13 +292,13 @@ TEST_F(TestServer, rbus_openBrokerConnection2_test3)
 TEST_F(TestServer, rbus_openBrokerConnection2_test4)
 {
     char server_name[20] = "test_server_2";
-    const char * broker_address = "unix:///tmp/rtrouted";
     rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
 
-    if(RBUS_OPEN_BROKER_CONNECTION2(server_name,broker_address,RTMESSAGE_BUS_SUCCESS))
+    get_broker_address();
+    if(RBUS_OPEN_BROKER_CONNECTION2(server_name,g_broker_address,RTMESSAGE_BUS_SUCCESS))
     {
 
-        err = rbus_openBrokerConnection2(server_name,broker_address);
+        err = rbus_openBrokerConnection2(server_name,g_broker_address);
         EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
 
         RBUS_CLOSE_BROKER_CONNECTION(RTMESSAGE_BUS_SUCCESS);

@@ -381,7 +381,7 @@ TEST_F(MultipleServerTest, rbus_multipleServer_test4)
     bool conn_status = false;
     char name_buf[100];
     char data_buf[100];
-    int server_count = 20;
+    int server_count = 8;
     int object_count = 3;
     pid_t pid[server_count];
     bool is_parent = true;
@@ -433,7 +433,7 @@ TEST_F(MultipleServerTest, rbus_multipleServer_test5)
     bool conn_status = false;
     char name_buf[100];
     char data_buf[100];
-    int server_count = 20;
+    int server_count = 14;
     int object_count = 3;
     pid_t pid[server_count];
     bool is_parent = true;

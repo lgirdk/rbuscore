@@ -147,7 +147,7 @@ TEST_F(EventClientAPIs, rbus_subscribeToEvent_test1)
     ASSERT_EQ(conn_status, true) << "RBUS_OPEN_BROKER_CONNECTION failed";
     //Test with invalid objname passed
      err = rbus_subscribeToEvent(NULL, "event_1", &event_callback, NULL, NULL);
-     ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_REMOTE_END_FAILED_TO_RESPOND) << "rbus_subscribeToEvent failed";
+     ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_DESTINATION_UNREACHABLE) << "rbus_subscribeToEvent failed";
     //Test with the event name  to be NULL
      err = rbus_subscribeToEvent(obj_name, "NULL", &event_callback, NULL, NULL);
      ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_GENERAL) << "rbus_subscribeToEvent failed";
@@ -194,7 +194,7 @@ TEST_F(EventClientAPIs, rbus_unsubscribeFromEvent_test1)
     ASSERT_EQ(conn_status, true) << "RBUS_OPEN_BROKER_CONNECTION failed";
     //Test with objname to be NULL
     err = rbus_unsubscribeFromEvent(NULL, "event_1");
-    ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_REMOTE_END_FAILED_TO_RESPOND) << "rbus_unsubscribeFromEvent failed";
+    ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_DESTINATION_UNREACHABLE) << "rbus_unsubscribeFromEvent failed";
    //Test with the event name  to be NULL
     err = rbus_unsubscribeFromEvent(obj_name, NULL);
     ASSERT_EQ(err,RTMESSAGE_BUS_ERROR_GENERAL) << "rbus_unsubscribeFromEvent failed";

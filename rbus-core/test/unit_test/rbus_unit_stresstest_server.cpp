@@ -144,20 +144,13 @@ static bool RBUS_PUSH_OBJECT(char* data, char* server_obj, rbus_error_t expected
     return true;
 }
 
-::testing::AssertionResult doesStringMatch(const char * ipString, const char stringList[][MAX_ELEMENT_NAME_LENGTH], int stringCount)
+::testing::AssertionResult doesStringMatch(const char * ipString, const char *resultstring, int stringCount)
 {
-    int i = 0;
-    if ((NULL != ipString) && (NULL != stringList) && (0 != stringCount))
+    if ((NULL != ipString) && (NULL != resultstring) && (0 != stringCount))
     {
-        if(strlen(ipString) > MAX_ELEMENT_NAME_LENGTH)
-            return ::testing::AssertionFailure() << "String is unexpectedly long";
-
-        for(i = 0; i < stringCount; i++)
+        if(!strncmp(ipString, resultstring, stringCount))
         {
-            if(!strncmp(ipString, *(stringList + i), strlen(ipString)))
-            {
-                return ::testing::AssertionSuccess();
-            }
+            return ::testing::AssertionSuccess();
         }
     }
     return ::testing::AssertionFailure() << "String is not in the list";
@@ -448,40 +441,36 @@ TEST_F(StressTestServer, rbus_resolveWildcardDestination_test1)
         conn_status = OPEN_BROKER_CONNECTION(client_name);
 
         resolveWildcardExpression("test.", 3, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj1_elements, obj1_element_count));
-        EXPECT_TRUE(doesStringMatch(*(result_array + 1), obj2_elements, obj2_element_count));
-        EXPECT_TRUE(doesStringMatch(*(result_array + 2), obj3_elements, obj3_element_count));
+        EXPECT_TRUE(doesStringMatch(*(result_array), server_obj1, strlen(server_obj1)));
+        EXPECT_TRUE(doesStringMatch(*(result_array + 1), server_obj2, strlen(server_obj2)));
+        EXPECT_TRUE(doesStringMatch(*(result_array + 2), server_obj3, strlen(server_obj3)));
 
         memset(result_array, 0, sizeof(result_array));
         resolveWildcardExpression("test.dac1.", 3, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj1_elements, obj1_element_count));
-        EXPECT_TRUE(doesStringMatch(*(result_array + 1), obj2_elements, obj2_element_count));
-        EXPECT_TRUE(doesStringMatch(*(result_array + 2), obj3_elements, obj3_element_count));
+        EXPECT_TRUE(doesStringMatch(*(result_array), server_obj1, strlen(server_obj1)));
+        EXPECT_TRUE(doesStringMatch(*(result_array + 1), server_obj2, strlen(server_obj2)));
+        EXPECT_TRUE(doesStringMatch(*(result_array + 2), server_obj3, strlen(server_obj3)));
 
         memset(result_array, 0, sizeof(result_array));
         resolveWildcardExpression("test.dac2.", 3, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj1_elements, obj1_element_count));
-        EXPECT_TRUE(doesStringMatch(*(result_array + 1), obj2_elements, obj2_element_count));
-        EXPECT_TRUE(doesStringMatch(*(result_array + 2), obj3_elements, obj3_element_count));
+        EXPECT_TRUE(doesStringMatch(*(result_array), server_obj1, strlen(server_obj1)));
+        EXPECT_TRUE(doesStringMatch(*(result_array + 1), server_obj2, strlen(server_obj2)));
+        EXPECT_TRUE(doesStringMatch(*(result_array + 2), server_obj3, strlen(server_obj3)));
 
         memset(result_array, 0, sizeof(result_array));
         resolveWildcardExpression("test.dac3.", 3, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj1_elements, obj1_element_count));
-        EXPECT_TRUE(doesStringMatch(*(result_array + 1), obj2_elements, obj2_element_count));
-        EXPECT_TRUE(doesStringMatch(*(result_array + 2), obj3_elements, obj3_element_count));
+        EXPECT_TRUE(doesStringMatch(*(result_array), server_obj1, strlen(server_obj1)));
+        EXPECT_TRUE(doesStringMatch(*(result_array + 1), server_obj2, strlen(server_obj2)));
+        EXPECT_TRUE(doesStringMatch(*(result_array + 2), server_obj3, strlen(server_obj3)));
 
         memset(result_array, 0, sizeof(result_array));
-        resolveWildcardExpression("test.dac1.box1", 1, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj1_elements, obj1_element_count));
+        resolveWildcardExpression("test.dac1.box1", 0, result_array);
 
         memset(result_array, 0, sizeof(result_array));
-        resolveWildcardExpression("test.dac1.gw1", 1, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj3_elements, obj3_element_count));
+        resolveWildcardExpression("test.dac1.gw1", 0, result_array);
 
         memset(result_array, 0, sizeof(result_array));
-        resolveWildcardExpression("test.dac3.cam3", 1, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj2_elements, obj2_element_count));
-        memset(result_array, 0, sizeof(result_array));
+        resolveWildcardExpression("test.dac3.cam3", 0, result_array);
 
         if(conn_status)
             CLOSE_BROKER_CONNECTION();
@@ -543,8 +532,8 @@ TEST_F(StressTestServer, rbus_resolveWildcardDestination_test2)
         sleep(2);
         conn_status = OPEN_BROKER_CONNECTION(client_name);
         resolveWildcardExpression("test.", 2, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj1_elements, obj1_element_count));
-        EXPECT_TRUE(doesStringMatch(*(result_array + 1), obj2_elements, obj2_element_count));
+        EXPECT_TRUE(doesStringMatch(*(result_array), server_obj1, strlen(server_obj1)));
+        EXPECT_TRUE(doesStringMatch(*(result_array + 1), server_obj2, strlen(server_obj2)));
         if(conn_status)
             CLOSE_BROKER_CONNECTION();
 
@@ -606,8 +595,8 @@ TEST_F(StressTestServer, rbus_resolveWildcardDestination_test3)
         sleep(2);
         conn_status = OPEN_BROKER_CONNECTION(client_name);
         resolveWildcardExpression("global.", 2, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj1_elements, obj1_element_count));
-        EXPECT_TRUE(doesStringMatch(*(result_array + 1), obj2_elements, obj2_element_count));
+        EXPECT_TRUE(doesStringMatch(*(result_array), server_obj1, strlen(server_obj1)));
+        EXPECT_TRUE(doesStringMatch(*(result_array + 1), server_obj2, strlen(server_obj2)));
         if(conn_status)
             CLOSE_BROKER_CONNECTION();
 
@@ -668,8 +657,8 @@ TEST_F(StressTestServer, rbus_resolveWildcardDestination_test4)
         sleep(2);
         conn_status = OPEN_BROKER_CONNECTION(client_name);
         resolveWildcardExpression("global.", 2, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj1_elements, obj1_element_count));
-        EXPECT_TRUE(doesStringMatch(*(result_array + 1), obj2_elements, obj2_element_count));
+        EXPECT_TRUE(doesStringMatch(*(result_array), server_obj1, strlen(server_obj1)));
+        EXPECT_TRUE(doesStringMatch(*(result_array + 1), server_obj2, strlen(server_obj2)));
         if(conn_status)
             CLOSE_BROKER_CONNECTION();
 
@@ -731,20 +720,20 @@ TEST_F(StressTestServer, rbus_resolveWildcardDestination_test5)
         sleep(2);
         conn_status = OPEN_BROKER_CONNECTION(client_name);
         resolveWildcardExpression("global.", 2, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj1_elements, obj1_element_count));
-        EXPECT_TRUE(doesStringMatch(*(result_array + 1), obj2_elements, obj2_element_count));
+        EXPECT_TRUE(doesStringMatch(*(result_array), server_obj1, strlen(server_obj1)));
+        EXPECT_TRUE(doesStringMatch(*(result_array + 1), server_obj2, strlen(server_obj2)));
 
         memset(result_array, 0, sizeof(result_array));
         resolveWildcardExpression("test.", 1, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj1_elements, obj1_element_count));
+        EXPECT_TRUE(doesStringMatch(*(result_array), server_obj1, strlen(server_obj1)));
 
         memset(result_array, 0, sizeof(result_array));
         resolveWildcardExpression("test.dac2.", 1, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj1_elements, obj1_element_count));
+        EXPECT_TRUE(doesStringMatch(*(result_array), server_obj1, strlen(server_obj1)));
 
         memset(result_array, 0, sizeof(result_array));
         resolveWildcardExpression("global.obj2.", 1, result_array);
-        EXPECT_TRUE(doesStringMatch(*(result_array), obj2_elements, obj2_element_count));
+        EXPECT_TRUE(doesStringMatch(*(result_array), server_obj2, strlen(server_obj2)));
 
         if(conn_status)
             CLOSE_BROKER_CONNECTION();
