@@ -35,7 +35,7 @@ extern "C" {
 
 
 #define DEFAULT_RESULT_FILEPATH "/tmp/Gtest_Report/"
-#define DEFAULT_RESULT_FILENAME "rbus_gtest_report.xml"
+#define DEFAULT_RESULT_FILENAME "rbuscore_gtest_report.xml"
 #define DEFAULT_RESULT_BUFFERSIZE 128
 
 GTEST_API_ int main(int argc, char *argv[])
