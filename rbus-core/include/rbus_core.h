@@ -57,6 +57,9 @@ rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char 
 /* Close connection with daemon. Messaging services will cease. */
 rbus_error_t rbus_closeBrokerConnection(void);
 
+/* Get the underlying rtMessage connection handle */
+rtConnection rbus_getConnection();
+
 /* Register an object with the bus. An object is an addressable endpoint that other elements on the bus can send messages to. Any messages sent
  * on the bus with destination = object_name will be routed to this component and invoke the handler. */
 rbus_error_t rbus_registerObj(const char * object_name, rbus_callback_t handler, void * user_data);

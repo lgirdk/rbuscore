@@ -562,6 +562,11 @@ rbus_error_t rbus_openBrokerConnection(const char * component_name)
 	return rbus_openBrokerConnection2(component_name, g_daemon_address);
 }
 
+rtConnection rbus_getConnection()
+{
+    return g_connection;
+}
+
 static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rbusMessage filter, int* providerError)
 {
     /* Method definition to add new event subscription: 
