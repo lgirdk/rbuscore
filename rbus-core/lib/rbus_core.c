@@ -1,4 +1,4 @@
-                                                                        /*
+/*
   * If not stated otherwise in this file or this component's Licenses.txt file
   * the following copyright and licenses apply:
   *
@@ -511,6 +511,9 @@ rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char 
 {
 	rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
 	rtError result = RT_OK;
+	char *pTempBuff = NULL;
+	int length = 0;
+
 	if(NULL == component_name)
 	{
 		RBUSCORELOG_ERROR("Invalid parameter.");
@@ -521,12 +524,18 @@ rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char 
 		RBUSCORELOG_INFO("A connection already exists. Cannot open a new one.");
 		return RTMESSAGE_BUS_ERROR_INVALID_STATE;
 	}
+	length = strlen (component_name);
+	pTempBuff = (char*) calloc (1, length + 10);
+
+	sprintf (pTempBuff, "rbus.%s", component_name);
+
 	perform_init();
-	result = rtConnection_Create(&g_connection, component_name, broker_address);
+	result = rtConnection_Create(&g_connection, pTempBuff, broker_address);
 	if(RT_OK != result)
 	{
 		RBUSCORELOG_ERROR("Failed to create a connection. Error: 0x%x", result);
 		g_connection = NULL;
+		free (pTempBuff);
 		return RTMESSAGE_BUS_ERROR_GENERAL;
 	}
     /*
@@ -535,6 +544,7 @@ rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char 
 		g_server_objects[i].callback = dummyOnMessage;
 	}*/
 	RBUSCORELOG_DEBUG("Successfully created connection for %s.", component_name );
+	free (pTempBuff);
 	return ret;
 }
 
@@ -884,7 +894,10 @@ rbus_error_t rbus_addElement(const char * object_name, const char * element)
     if(RT_OK != err)
     {
         RBUSCORELOG_ERROR("Failed to add element. Error: 0x%x", err);
-        return RTMESSAGE_BUS_ERROR_GENERAL;
+        if (RT_ERROR_DUPLICATE_ENTRY == err)
+            return RTMESSAGE_BUS_ERROR_DUPLICATE_ENTRY;
+        else
+            return RTMESSAGE_BUS_ERROR_GENERAL;
     }
 
     RBUSCORELOG_DEBUG("Added alias %s for object %s.", element, object_name);
