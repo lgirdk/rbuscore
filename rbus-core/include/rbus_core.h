@@ -184,6 +184,9 @@ rbus_error_t rbus_discoverObjectElements(const char * object, int * count, char 
  represented by an empty string in the objects array. If this function returns error, do not try to dereference/free 'objects'.*/
 rbus_error_t rbus_discoverElementObjects(const char* element, int * count, char *** objects);
 
+/*same as above but for multiple elements*/
+rbus_error_t rbus_discoverElementsObjects(int numElements, const char** elements, int * count, char *** objects);
+
 rbus_error_t rbus_discoverRegisteredComponents(int * count, char *** components);
 
 /* Get the rbus status; to find out whether the rbus is enabled or not. The application can take action (ex: registration of events) based on this return value. */

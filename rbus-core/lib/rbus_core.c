@@ -1739,17 +1739,17 @@ rbus_error_t rbus_discoverObjectElements(const char * object, int * count, char 
     return ret;
 }
 
-rbus_error_t rbus_discoverElementObjects(const char* elements, int * count, char *** objects)
+rbus_error_t rbus_discoverElementObjects(const char* element, int * count, char *** objects)
 {
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
     rtError err = RT_OK;
     rtMessage msg, rsp;
 
     rtMessage_Create(&msg);
-    if(NULL != elements)
+    if(NULL != element)
     {
         rtMessage_SetInt32(msg, RTM_DISCOVERY_COUNT, 1);
-        rtMessage_AddString(msg, RTM_DISCOVERY_ITEMS, elements);
+        rtMessage_AddString(msg, RTM_DISCOVERY_ITEMS, element);
     }
     else
     {
@@ -1796,6 +1796,81 @@ rbus_error_t rbus_discoverElementObjects(const char* elements, int * count, char
             {
                 RBUSCORELOG_ERROR("Memory allocation failure");
                 ret = RTMESSAGE_BUS_ERROR_INSUFFICIENT_MEMORY;
+            }
+        }
+        else
+        {
+            ret = RTMESSAGE_BUS_ERROR_GENERAL;
+        }
+        rtMessage_Release(msg);
+    }
+    else
+    {
+        ret = RTMESSAGE_BUS_ERROR_MALFORMED_RESPONSE;
+    }
+    
+    return ret;    
+}
+
+rbus_error_t rbus_discoverElementsObjects(int numElements, const char** elements, int * count, char *** objects)
+{
+    rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+    rtError err = RT_OK;
+    rtMessage msg, rsp;
+
+    rtMessage_Create(&msg);
+    if(NULL != elements)
+    {
+        int i;
+        rtMessage_SetInt32(msg, RTM_DISCOVERY_COUNT, numElements);
+        for(i = 0; i < numElements; ++i)
+            rtMessage_AddString(msg, RTM_DISCOVERY_ITEMS, elements[i]);
+    }
+    else
+    {
+        RBUSCORELOG_ERROR("Null entries in element list.");
+        rtMessage_Release(msg);
+        return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+    }
+
+    err = rtConnection_SendRequest(g_connection, msg, RTM_DISCOVER_ELEMENT_OBJECTS, &rsp, TIMEOUT_VALUE_FIRE_AND_FORGET);
+
+    rtMessage_Release(msg);
+    msg = rsp;
+
+    if(RT_OK == err)
+    {
+        int result;
+
+        if((RT_OK == rtMessage_GetInt32(msg, RTM_DISCOVERY_RESULT, &result)) && (RT_OK == result))
+        {
+            int i;
+
+            *count = numElements; /*the number of elements passed in should equal the number of components passed out*/
+            *objects = (char**)malloc(numElements * sizeof(char*));
+
+            for(i = 0; i < numElements; ++i)
+            {
+                int numComponents = 0;
+                const char* component = NULL;
+
+                if(rtMessage_GetInt32(msg, RTM_DISCOVERY_COUNT, &numComponents) == RT_OK)
+                {
+                    if(numComponents == 1)
+                    {
+                        if(rtMessage_GetStringItem(msg, RTM_DISCOVERY_ITEMS, i, &component) == RT_OK)
+                        {
+                            (*objects)[i] = strndup(component, MAX_OBJECT_NAME_LENGTH);
+                            continue;
+                        }                       
+                    }
+                }
+                RBUSCORELOG_ERROR("rbus_discoverElementsObjects: failed at %s", elements[i]);
+                ret = RTMESSAGE_BUS_ERROR_GENERAL;
+                for(--i; i >=0; --i)
+                    free((*objects)[i]);
+                free(*objects);
+                break;
             }
         }
         else
