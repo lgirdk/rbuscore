@@ -1817,6 +1817,10 @@ rbus_error_t rbus_discoverElementsObjects(int numElements, const char** elements
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
     rtError err = RT_OK;
     rtMessage msg, rsp;
+    char** array_ptr = NULL;
+    int array_count = 0;
+
+    *count = 0;
 
     rtMessage_Create(&msg);
     if(NULL != elements)
@@ -1846,31 +1850,50 @@ rbus_error_t rbus_discoverElementsObjects(int numElements, const char** elements
         {
             int i;
 
-            *count = numElements; /*the number of elements passed in should equal the number of components passed out*/
-            *objects = (char**)malloc(numElements * sizeof(char*));
-
-            for(i = 0; i < numElements; ++i)
+            for(i = 0; i < numElements && ret == RTMESSAGE_BUS_SUCCESS; ++i)
             {
                 int numComponents = 0;
                 const char* component = NULL;
 
                 if(rtMessage_GetInt32(msg, RTM_DISCOVERY_COUNT, &numComponents) == RT_OK)
                 {
-                    if(numComponents == 1)
+                    char **next = NULL;
+                    if(!array_ptr)
+                        next = (char **)malloc(numComponents * sizeof(char *));
+                    else
+                        next = (char **)realloc(array_ptr, (array_count + numComponents) * sizeof(char *));
+                    if (!next)
                     {
-                        if(rtMessage_GetStringItem(msg, RTM_DISCOVERY_ITEMS, i, &component) == RT_OK)
+                        RBUSCORELOG_ERROR("Memory allocation failure");
+                        ret = RTMESSAGE_BUS_ERROR_GENERAL;
+                        break;
+                    }
+                    array_ptr = next;
+                    for (int j = 0; j < numComponents; j++)
+                    {
+                        if (RT_OK != rtMessage_GetStringItem(msg, RTM_DISCOVERY_ITEMS, array_count, &component))
                         {
-                            (*objects)[i] = strndup(component, MAX_OBJECT_NAME_LENGTH);
-                            continue;
-                        }                       
+                            RBUSCORELOG_ERROR("Read item failure");
+                            ret = RTMESSAGE_BUS_ERROR_GENERAL;
+                            break;
+                        }
+                        if(component[0]) /*rtrouted will put a 0 len string if no route found*/
+                        {
+                            if (NULL == (array_ptr[array_count++] = strndup(component, MAX_OBJECT_NAME_LENGTH)))
+                            {
+                                RBUSCORELOG_ERROR("Memory allocation failure");
+                                ret = RTMESSAGE_BUS_ERROR_GENERAL;
+                                break;
+                            }
+                        }
                     }
                 }
-                RBUSCORELOG_ERROR("rbus_discoverElementsObjects: failed at %s", elements[i]);
-                ret = RTMESSAGE_BUS_ERROR_GENERAL;
-                for(--i; i >=0; --i)
-                    free((*objects)[i]);
-                free(*objects);
-                break;
+                else
+                {
+                    RBUSCORELOG_ERROR("rbus_discoverElementsObjects: failed at %s", elements[i]);
+                    ret = RTMESSAGE_BUS_ERROR_GENERAL;
+                    break;
+                }
             }
         }
         else
@@ -1883,7 +1906,21 @@ rbus_error_t rbus_discoverElementsObjects(int numElements, const char** elements
     {
         ret = RTMESSAGE_BUS_ERROR_MALFORMED_RESPONSE;
     }
-    
+
+    if (ret == RTMESSAGE_BUS_SUCCESS)
+    {
+        *count = array_count;
+        *objects = array_ptr;
+    }
+    else
+    {
+        if(array_ptr)
+        {
+            for (int i = 0; i < array_count; i++)
+                free(array_ptr[i]);
+            free(array_ptr);
+        }
+    }
     return ret;    
 }
 
