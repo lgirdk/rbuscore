@@ -83,6 +83,8 @@ else ()
 endif (BUILD_FOR_DESKTOP)
 
 if (BUILD_FOR_DESKTOP)
+    message("Building for desktop")
+
     ExternalProject_Add(
         msgpack
         GIT_REPOSITORY https://github.com/msgpack/msgpack-c.git
@@ -91,10 +93,11 @@ if (BUILD_FOR_DESKTOP)
         UPDATE_DISCONNECTED 1
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}/msgpack
         BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/msgpack/build
-        CMAKE_ARGS "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
+        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
+                   -DMSGPACK_BUILD_EXAMPLES=OFF
+                   -DMSGPACK_BUILD_TESTS=OFF
         BUILD_COMMAND make)
 
-    message("Building for desktop")
     set(MSGPACK_LIBRARIES "-lmsgpackc")
 
     include_directories(
