@@ -83,6 +83,7 @@ if (BUILD_FOR_DESKTOP)
 
     option(BUILD_RBUS_SAMPLE_APPS "BUILD_RBUS_SAMPLE_APPS" ON)
     option(BUILD_RBUS_UNIT_TEST "BUILD_RBUS_UNIT_TEST" ON)
+    add_definitions(-DRBUS_ALWAYS_ON)
 else ()
   find_package(msgpack REQUIRED)
 endif (BUILD_FOR_DESKTOP)
