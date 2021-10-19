@@ -26,9 +26,9 @@
 
 #include "rbus_core.h"
 #include "rbus_logger.h"
-#include "rtVector.h"
-#include "rtAdvisory.h"
-#include "rtMemory.h"
+#include <rtmessage/rtVector.h>
+#include <rtmessage/rtAdvisory.h>
+#include <rtmessage/rtMemory.h>
 
 void rbusMessage_BeginMetaSectionWrite(rbusMessage message);
 void rbusMessage_EndMetaSectionWrite(rbusMessage message);
