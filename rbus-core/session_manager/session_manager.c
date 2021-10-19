@@ -21,7 +21,7 @@
 #include <unistd.h>
 #include <string.h>
 #include "rbus_core.h"
-#include "rtLog.h"
+#include <rtmessage/rtLog.h>
 #include "rbus_session_mgr.h"
 
 static int g_counter;

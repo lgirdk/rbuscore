@@ -22,8 +22,8 @@
 #include <string.h>
 #include "rbus_core.h"
 
-#include "rtLog.h"
-#include "rtConnection.h"
+#include <rtmessage/rtLog.h>
+#include <rtmessage/rtConnection.h>
 
 #include <time.h>
 #include <sys/time.h>
