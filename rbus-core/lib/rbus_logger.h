@@ -32,7 +32,7 @@
 #define RBUSCORELOG_TRACE(format, ...)       RDK_LOG(RDK_LOG_TRACE1, "LOG.RDK.RBUSCORE", format"\n", ##__VA_ARGS__)
 
 #else
-#include "rtLog.h"
+#include <rtmessage/rtLog.h>
 
 #define RBUSCORELOG_ERROR(format...)        rtLog_Error(format)
 #define RBUSCORELOG_WARN(format...)         rtLog_Warn(format)

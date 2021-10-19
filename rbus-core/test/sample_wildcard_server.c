@@ -22,7 +22,7 @@
 #include <string.h>
 #include "rbus_core.h"
 
-#include "rtLog.h"
+#include <rtmessage/rtLog.h>
 
 static char data1[100] = "wifi init init init";
 static char data2[100] = "tr69 init init init";
