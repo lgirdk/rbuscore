@@ -19,11 +19,11 @@
 #ifndef __RBUS_CORE_H__
 #define __RBUS_CORE_H__
 
-#include <rtMessageHeader.h>
-#include <rtConnection.h>
+#include <rtmessage/rtMessageHeader.h>
+#include <rtmessage/rtConnection.h>
 #include "rbus_types.h"
 #include "rbus_message.h"
-#include <rtm_discovery_api.h>
+#include <rtmessage/rtm_discovery_api.h>
 
 #define MAX_OBJECT_NAME_LENGTH RTMSG_HEADER_MAX_TOPIC_LENGTH
 #define MAX_METHOD_NAME_LENGTH 64
