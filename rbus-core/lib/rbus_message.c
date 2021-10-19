@@ -23,7 +23,7 @@
 #include <string.h>
 #include <pthread.h>
 #include "rbus_logger.h"
-#include "rtRetainable.h"
+#include <rtmessage/rtRetainable.h>
 #include "rbus_message.h"
 
 #define VERIFY_UNPACK_NEXT_ITEM()\
