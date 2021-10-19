@@ -23,7 +23,7 @@
 #include "rbus_core.h"
 #include "bin_header.h"
 
-#include "rtLog.h"
+#include <rtmessage/rtLog.h>
 
 static char buffer[100];
 static binstruct_t mystruct;

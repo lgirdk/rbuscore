@@ -21,7 +21,7 @@
 #include <unistd.h>
 #include "rbus_core.h"
 
-#include "rtLog.h"
+#include <rtmessage/rtLog.h>
 
 #define OBJ1_NAME "foo"
 #define OBJ2_NAME "bar"

@@ -22,7 +22,7 @@
 #include <unistd.h>
 #include <string.h>
 #include "rbus_core.h"
-#include "rtLog.h"
+#include <rtmessage/rtLog.h>
 
 static char data[100] = "init init init";
 static int handle_get(const char * destination, const char * method, rbusMessage message, void * user_data, rbusMessage *response, const rtMessageHeader* hdr)

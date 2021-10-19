@@ -20,7 +20,7 @@
 #ifndef __rbusMessage_H__
 #define __rbusMessage_H__ 
 
-#include <rtError.h>
+#include <rtmessage/rtError.h>
 
 #ifdef __cplusplus
 extern "C" {

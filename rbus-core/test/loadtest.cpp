@@ -27,7 +27,7 @@
 
 #include "rbus_core.h"
 #include "rbus_types.h"
-#include "rtLog.h"
+#include <rtmessage/rtLog.h>
 #include <stdlib.h>
 #include <unistd.h>
 
