@@ -22,7 +22,7 @@
 #include "rbus_core.h"
 
 #include "rbus_session_mgr.h"
-#include "rtLog.h"
+#include <rtmessage/rtLog.h>
 
 
 static int g_current_session_id = 0; 
