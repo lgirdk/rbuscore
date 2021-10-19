@@ -22,7 +22,7 @@
 #include <string.h>
 #include "rbus_core.h"
 
-#include "rtLog.h"
+#include <rtmessage/rtLog.h>
 
 static char buffer[100];
 
