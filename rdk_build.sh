@@ -58,10 +58,22 @@ if [ "$XCAM_MODEL" == "SCHC2" ]; then
         echo "Setting environmental variables and Pre rule makefile for xCam2"
         source ${RDK_PROJECT_ROOT_PATH}/build/components/amba/sdk/setenv2
     fi
-elif [ "$XCAM_MODEL" == "SERXW3" ] || [ "$XCAM_MODEL" == "SERICAM2" ] || [ "$XCAM_MODEL" == "XHB1" ] || [ "$XCAM_MODEL" == "XHC3" ]; then
+elif [ "$XCAM_MODEL" == "SERXW3" ] || [ "$XCAM_MODEL" == "SERICAM2" ] || [ "$XCAM_MODEL" == "XHB1" ]; then
     echo "Setting environmental variables and Pre rule makefile for xCam/iCam2/DBC"
     source ${RDK_PROJECT_ROOT_PATH}/build/components/sdk/setenv2
-
+elif [ "$XCAM_MODEL" == "XHC3" ]; then
+    echo "Setting environmental variables and Pre rule makefile for XHC3"
+    source ${RDK_PROJECT_ROOT_PATH}/build/components/sdk/setenv2
+    RDK_PATCHES=$RDK_PROJECT_ROOT_PATH/build/components/opensource/patch
+    if [ ! -f $RDK_PATCHES/.rbuscore.patched ]; then
+        echo "applying patch for XHC3 rbuscore"
+        cd ${RDK_PROJECT_ROOT_PATH}/rbuscore
+        git apply $RDK_PATCHES/rbuscore.diff
+        touch $RDK_PATCHES/.rbuscore.patched
+        cd -
+    else
+        echo "Patch already applied so going ahead with the build"
+    fi
 else #No Matching platform
         echo "Source environment that include packages for your platform. The environment variables PROJ_PRERULE_MAK_FILE should refer to the platform s PreRule make"
 fi
