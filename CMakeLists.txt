@@ -17,10 +17,15 @@
 # limitations under the License.
 ##########################################################################
 cmake_minimum_required (VERSION 2.8.7)
-cmake_policy(SET CMP0048 NEW)
 
-project(rbuscore
-    VERSION 0.1.0)
+if (POLICY CMP0048)
+  cmake_policy(SET CMP0048 NEW)
+  project(rbuscore VERSION 0.1.0)
+else () 
+  project(rbuscore)
+  set(PROJECT_VERSION "0.1.0")
+endif (POLICY CMP0048)
+
 include(ExternalProject)
 cmake_policy(SET CMP0015 NEW)
 set(CMAKE_BUILD_TYPE Debug)

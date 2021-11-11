@@ -16,10 +16,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ##########################################################################
-cmake_policy(SET CMP0048 NEW)
-
-project(rbus-core
-    VERSION 0.0.0)
+if (POLICY CMP0048)
+  cmake_policy(SET CMP0048 NEW)
+  project(rbus-core VERSION 0.0.0)
+else ()
+  project(rbus-core)
+  set(PROJECT_VERSION "0.0.0")
+endif (POLICY CMP0048)
 
 include_directories(
     ../..
