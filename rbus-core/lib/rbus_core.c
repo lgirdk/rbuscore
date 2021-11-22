@@ -906,6 +906,12 @@ rbus_error_t rbus_addElement(const char * object_name, const char * element)
 
 rbus_error_t rbus_removeElement(const char * object, const char * element)
 {
+    if(NULL == g_connection)
+    {
+        RBUSCORELOG_ERROR("Not connected.");
+        return RTMESSAGE_BUS_ERROR_INVALID_STATE;
+    }
+
     if((NULL == object) || (NULL == element))
     {
         RBUSCORELOG_ERROR("Object/element name is NULL");
@@ -979,6 +985,13 @@ rbus_error_t rbus_invokeRemoteMethod(const char * object_name, const char *metho
 {
     rtError err = RT_OK;
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+
+    if(NULL == g_connection)
+    {
+        RBUSCORELOG_ERROR("Not connected.");
+        return RTMESSAGE_BUS_ERROR_INVALID_STATE;
+    }
+
     if(MAX_OBJECT_NAME_LENGTH <= strnlen(object_name, MAX_OBJECT_NAME_LENGTH))
     {
         RBUSCORELOG_ERROR("Object name is too long.");
@@ -1081,6 +1094,12 @@ static rbus_error_t rbus_sendMessage(rbusMessage msg, const char * destination, 
     rtError ret;
     uint8_t* data = NULL;
     uint32_t dataLength = 0;
+
+    if(NULL == g_connection)
+    {
+        RBUSCORELOG_ERROR("Not connected.");
+        return RTMESSAGE_BUS_ERROR_INVALID_STATE;
+    }
 
     rbusMessage_ToBytes(msg, &data, &dataLength);
     ret = rtConnection_SendBinaryDirect(g_connection, data, dataLength, destination, sender);
@@ -1202,6 +1221,12 @@ rbus_error_t rbus_registerEvent(const char* object_name, const char * event_name
     /*using namespace rbus_server;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
     server_object_t obj;
+
+    if(NULL == g_connection)
+    {
+        RBUSCORELOG_ERROR("Not connected.");
+        return RTMESSAGE_BUS_ERROR_INVALID_STATE;
+    }
 
     if(NULL == event_name)
         event_name = DEFAULT_EVENT;
@@ -1381,6 +1406,12 @@ rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event
     if(object_name == NULL && event_name != NULL) 
         object_name = event_name;
 
+    if(NULL == g_connection)
+    {
+        RBUSCORELOG_ERROR("Not connected.");
+        return RTMESSAGE_BUS_ERROR_INVALID_STATE;
+    }
+
     if((NULL == object_name) || (NULL == callback))
     {
         RBUSCORELOG_ERROR("Invalid parameter(s)");
@@ -1474,6 +1505,13 @@ rbus_error_t rbus_publishEvent(const char* object_name,  const char * event_name
 {
     /*using namespace rbus_server;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+
+    if(NULL == g_connection)
+    {
+        RBUSCORELOG_ERROR("Not connected.");
+        return RTMESSAGE_BUS_ERROR_INVALID_STATE;
+    }
+
     if(NULL == event_name)
         event_name = DEFAULT_EVENT;
     if(MAX_OBJECT_NAME_LENGTH <= strnlen(object_name, MAX_OBJECT_NAME_LENGTH))
@@ -1620,6 +1658,18 @@ rbus_error_t rbus_discoverWildcardDestinations(const char * expression, int * co
     rtError err = RT_OK;
     rtMessage msg, rsp;
 
+    if(NULL == g_connection)
+    {
+        RBUSCORELOG_ERROR("Not connected.");
+        return RTMESSAGE_BUS_ERROR_INVALID_STATE;
+    }
+
+    if((NULL == expression) || (NULL == count) || (NULL == destinations))
+    {
+        RBUSCORELOG_ERROR("expression/count/destinations pointer is NULL");
+        return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+    }
+
     rtMessage_Create(&msg);
     rtMessage_SetString(msg, RTM_DISCOVERY_EXPRESSION, expression);
 
@@ -1693,6 +1743,18 @@ rbus_error_t rbus_discoverObjectElements(const char * object, int * count, char 
     rtError err = RT_OK;
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
     rtMessage msg, rsp;
+
+    if(NULL == g_connection)
+    {
+        RBUSCORELOG_ERROR("Not connected.");
+        return RTMESSAGE_BUS_ERROR_INVALID_STATE;
+    }
+
+    if((NULL == object) || (NULL == elements) || (NULL == count))
+    {
+        RBUSCORELOG_ERROR("Object/elements/count is NULL");
+        return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
+    }
 
     rtMessage_Create(&msg);
     rtMessage_SetString(msg, RTM_DISCOVERY_EXPRESSION, object);
@@ -1946,6 +2008,12 @@ rbus_error_t rbus_discoverRegisteredComponents(int * count, char *** components)
     rtMessage_Create(&out);
     rtMessage_SetInt32(out, "dummy", 0);
     
+    if(NULL == g_connection)
+    {
+        RBUSCORELOG_ERROR("Not connected.");
+        return RTMESSAGE_BUS_ERROR_INVALID_STATE;
+    }
+
     err = rtConnection_SendRequest(g_connection, out, RTM_DISCOVER_REGISTERED_COMPONENTS, &msg, TIMEOUT_VALUE_FIRE_AND_FORGET);
 
     if(RT_OK == err)

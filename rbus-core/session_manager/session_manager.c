@@ -124,9 +124,18 @@ int main(int argc, char *argv[])
     printf("rbus session manager launching.\n");
     rtLog_SetLevel(RT_LOG_INFO);
 
-    if((err = rbus_openBrokerConnection(RBUS_SMGR_DESTINATION_NAME)) == RTMESSAGE_BUS_SUCCESS)
+    while(1)
     {
-        printf("Successfully connected to bus.\n");
+        if((err = rbus_openBrokerConnection(RBUS_SMGR_DESTINATION_NAME)) == RTMESSAGE_BUS_SUCCESS)
+        {
+            printf("Successfully connected to bus.\n");
+            break;
+        }
+        else
+        {
+            printf("Error in connecting to the bus.\n");
+            sleep(10);
+        }
     }
 
     if((err = rbus_registerObj(RBUS_SMGR_DESTINATION_NAME, callback, NULL)) == RTMESSAGE_BUS_SUCCESS)
