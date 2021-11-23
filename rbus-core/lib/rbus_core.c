@@ -318,7 +318,7 @@ static int unlock()
 	return pthread_mutex_unlock(&g_mutex);
 }
 
-static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rbusMessage filter, int* providerError);
+static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rbusMessage filter, int* providerError, int timeout);
 
 static void perform_init()
 {
@@ -357,7 +357,7 @@ static void perform_cleanup()
             for(i2 = 0; i2 < sz2; i2++)
             {   
                 client_event_t event = rtVector_At(sub->events, i2);
-                send_subscription_request(sub->object, event->name, false, NULL, NULL);
+                send_subscription_request(sub->object, event->name, false, NULL, NULL, 0);
             }
         }
         lock();
@@ -577,7 +577,7 @@ rtConnection rbus_getConnection()
     return g_connection;
 }
 
-static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rbusMessage filter, int* providerError)
+static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rbusMessage filter, int* providerError, int timeout_ms)
 {
     /* Method definition to add new event subscription: 
      * method name: METHOD_ADD_EVENT_SUBSCRIPTION / METHOD_REMOVE_EVENT_SUBSCRIPTION.
@@ -595,8 +595,10 @@ static rbus_error_t send_subscription_request(const char * object_name, const ch
     if(filter)
         rbusMessage_SetMessage(request, filter);
 
+    if(timeout_ms <= 0)
+        timeout_ms = TIMEOUT_VALUE_FIRE_AND_FORGET;
     ret = rbus_invokeRemoteMethod(object_name, (activate? METHOD_ADD_EVENT_SUBSCRIPTION : METHOD_REMOVE_EVENT_SUBSCRIPTION),
-            request, TIMEOUT_VALUE_FIRE_AND_FORGET, &response);
+            request, timeout_ms, &response);
     if(RTMESSAGE_BUS_SUCCESS == ret)
     {
         rtError extract_ret;
@@ -1395,7 +1397,7 @@ static rbus_error_t remove_subscription_callback(const char * object_name,  cons
     return ret;
 }
 
-rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage filter, void * user_data, int* providerError)
+static rbus_error_t rbus_subscribeToEventInternal(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage filter, void * user_data, int* providerError, int timeout)
 {
     /*using namespace rbus_client;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
@@ -1465,7 +1467,7 @@ rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event
 
     unlock();
 
-    if((ret = send_subscription_request(object_name, event_name, true, filter, providerError)) != RTMESSAGE_BUS_SUCCESS)
+    if((ret = send_subscription_request(object_name, event_name, true, filter, providerError, timeout)) != RTMESSAGE_BUS_SUCCESS)
     {
         /*Something went wrong in the RPC. Undo what we did so far and report error.*/
         lock();
@@ -1473,6 +1475,16 @@ rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event
         unlock();
     }
     return ret;
+}
+
+rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage filter, void * user_data, int* providerError)
+{
+    return rbus_subscribeToEventInternal(object_name, event_name, callback, filter, user_data, providerError, 0);
+}
+
+rbus_error_t rbus_subscribeToEventTimeout(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage filter, void * user_data, int* providerError, int timeout)
+{
+    return rbus_subscribeToEventInternal(object_name, event_name, callback, filter, user_data, providerError, timeout);
 }
 
 rbus_error_t rbus_unsubscribeFromEvent(const char * object_name,  const char * event_name, const rbusMessage filter)
@@ -1497,7 +1509,7 @@ rbus_error_t rbus_unsubscribeFromEvent(const char * object_name,  const char * e
         event_name = DEFAULT_EVENT;
 
     remove_subscription_callback(object_name, event_name);
-    ret = send_subscription_request(object_name, event_name, false, filter, NULL);
+    ret = send_subscription_request(object_name, event_name, false, filter, NULL, 0);
     return ret;
 }
 
