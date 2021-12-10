@@ -34,6 +34,31 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
 find_package(PkgConfig REQUIRED)
 find_package(rtMessage REQUIRED)
 
+IF (NOT DEFINED CMAKE_INSTALL_BINDIR)
+    SET(CMAKE_INSTALL_BINDIR ${CMAKE_INSTALL_PREFIX}/bin)
+ENDIF ()
+
+IF (NOT DEFINED CMAKE_INSTALL_LIBDIR)
+    SET(CMAKE_INSTALL_LIBDIR ${CMAKE_INSTALL_PREFIX}/lib)
+ENDIF ()
+
+include(CMakePackageConfigHelpers)
+
+SET (CMAKE_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/rbus-core")
+
+configure_package_config_file(rbus-coreConfig.cmake.in
+  rbus-coreConfig.cmake
+  INSTALL_DESTINATION "${CMAKE_INSTALL_CMAKEDIR}")
+
+write_basic_package_version_file(
+  rbus-coreConfigVersion.cmake
+  VERSION 1.1.1
+  COMPATIBILITY AnyNewerVersion )
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/rbus-coreConfig.cmake"
+              "${CMAKE_CURRENT_BINARY_DIR}/rbus-coreConfigVersion.cmake"
+        DESTINATION "${CMAKE_INSTALL_CMAKEDIR}" )
+
 include_directories(${RTMESSAGE_INCLUDE_DIRS})
 link_directories(${RTMESSAGE_LIBRARIES})
 include_directories(${CJSON_INCLUDE_DIRS})
@@ -123,6 +148,30 @@ else()
     include_directories(${RTMESSAGE_INCLUDE_DIRS} ${MSGPACK_INCLUDE_DIRS} ${RDKLOGGER_INCLUDE_DIRS})
     link_directories(${CMAKE_CURRENT_SOURCE_DIR} ${LIBRARY_DIR})
 endif (BUILD_FOR_DESKTOP)
+
+add_library(rbusCore ${CMAKE_INSTALL_PREFIX})
+
+SET_TARGET_PROPERTIES (rbusCore PROPERTIES OUTPUT_NAME "rbusCore")
+SET_TARGET_PROPERTIES(rbusCore PROPERTIES LINKER_LANGUAGE C)
+
+SET (RBUSCORE_INSTALLTARGETS rbusCore)
+
+INSTALL (TARGETS ${RBUSCORE_INSTALLTARGETS} EXPORT rbusCore-targets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+EXPORT (EXPORT rbusCore-targets
+    FILE "${CMAKE_CURRENT_BINARY_DIR}/rbusCore-targets.cmake"
+)
+
+INSTALL (EXPORT rbusCore-targets
+    FILE
+        rbusCore-targets.cmake
+    DESTINATION
+        "${CMAKE_INSTALL_CMAKEDIR}"
+)
 
     add_subdirectory(rbus-core/lib)
     add_subdirectory(rbus-core/session_manager)
