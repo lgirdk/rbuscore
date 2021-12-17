@@ -65,6 +65,10 @@ if (ENABLE_RDKLOGGER)
     add_definitions(-DENABLE_RDKLOGGER)
 endif (ENABLE_RDKLOGGER)
 
+if (RBUS_ALWAYS_ON)
+    add_definitions(-DRBUS_ALWAYS_ON)
+endif (RBUS_ALWAYS_ON)
+
 if (BUILD_FOR_DESKTOP)
     if (ENABLE_CLANG_TIDY)
         find_program(GENERATOR run-clang-tidy)
