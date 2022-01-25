@@ -185,7 +185,7 @@ void server_object_destroy(void* p)
     free(obj);
 }
 
-rbus_error_t server_object_subscription_handler(server_object_t obj, const char * event, char const* subscriber, int added, rbusMessage filter)
+rbus_error_t server_object_subscription_handler(server_object_t obj, const char * event, char const* subscriber, int added, rbusMessage payload)
 {
     rbus_error_t ret;
 
@@ -199,7 +199,7 @@ rbus_error_t server_object_subscription_handler(server_object_t obj, const char 
     
     if(obj->subscribe_handler_override)
     {
-        ret = (rbus_error_t)obj->subscribe_handler_override(obj->name, event, subscriber, added, filter, obj->subscribe_handler_data);
+        ret = (rbus_error_t)obj->subscribe_handler_override(obj->name, event, subscriber, added, payload, obj->subscribe_handler_data);
         if(ret != RTMESSAGE_BUS_SUBSCRIBE_NOT_HANDLED)
             return ret;
     }
@@ -306,6 +306,9 @@ static rtVector g_queued_requests; /*list of queued_request */
 static bool g_advisory_listener_installed = false;
 static rbus_client_disconnect_callback_t g_client_disconnect_callback = NULL;
 
+rbus_event_callback_t g_master_event_callback = NULL;
+void* g_master_event_user_data = NULL;
+
 /* End global variables*/
 
 static int lock()
@@ -318,7 +321,7 @@ static int unlock()
 	return pthread_mutex_unlock(&g_mutex);
 }
 
-static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rbusMessage filter, int* providerError, int timeout);
+static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rbusMessage payload, int* providerError, int timeout);
 
 static void perform_init()
 {
@@ -577,7 +580,7 @@ rtConnection rbus_getConnection()
     return g_connection;
 }
 
-static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rbusMessage filter, int* providerError, int timeout_ms)
+static rbus_error_t send_subscription_request(const char * object_name, const char * event_name, bool activate, const rbusMessage payload, int* providerError, int timeout_ms)
 {
     /* Method definition to add new event subscription: 
      * method name: METHOD_ADD_EVENT_SUBSCRIPTION / METHOD_REMOVE_EVENT_SUBSCRIPTION.
@@ -591,9 +594,9 @@ static rbus_error_t send_subscription_request(const char * object_name, const ch
 
     rbusMessage_SetString(request, event_name);
     rbusMessage_SetString(request, rtConnection_GetReturnAddress(g_connection));
-    rbusMessage_SetInt32(request, filter ? 1 : 0);
-    if(filter)
-        rbusMessage_SetMessage(request, filter);
+    rbusMessage_SetInt32(request, payload ? 1 : 0);
+    if(payload)
+        rbusMessage_SetMessage(request, payload);
 
     if(timeout_ms <= 0)
         timeout_ms = TIMEOUT_VALUE_FIRE_AND_FORGET;
@@ -1116,8 +1119,8 @@ static int subscription_handler(const char *not_used, const char * method_name, 
     /*using namespace rbus_server;*/
     const char * sender = NULL;
     const char * event_name = NULL;
-    int has_filter = 0;
-    rbusMessage filter = NULL;
+    int has_payload = 0;
+    rbusMessage payload = NULL;
     server_object_t obj = (server_object_t)user_data;
     (void)not_used;
 
@@ -1134,13 +1137,13 @@ static int subscription_handler(const char *not_used, const char * method_name, 
         }
         else
         {
-            rbusMessage_GetInt32(in, &has_filter);
-            if(has_filter)
-                rbusMessage_GetMessage(in, &filter);
+            rbusMessage_GetInt32(in, &has_payload);
+            if(has_payload)
+                rbusMessage_GetMessage(in, &payload);
             int added = strncmp(method_name, METHOD_ADD_EVENT_SUBSCRIPTION, MAX_METHOD_NAME_LENGTH) == 0 ? 1 : 0;
-            rbus_error_t ret = server_object_subscription_handler(obj, event_name, sender, added, filter);
-            if(filter)
-                rbusMessage_Release(filter);
+            rbus_error_t ret = server_object_subscription_handler(obj, event_name, sender, added, payload);
+            if(payload)
+                rbusMessage_Release(payload);
             rbusMessage_SetInt32(*out, ret);
         }
     }
@@ -1309,26 +1312,30 @@ rbus_error_t rbus_unregisterEvent(const char* object_name, const char * event_na
 
 static void master_event_callback(rtMessageHeader const* hdr, uint8_t const* data, uint32_t dataLen, void* closure)
 {
-    rbusMessage msg;
-
-    rbusMessage_FromBytes(&msg, data, dataLen);
-
     /*using namespace rbus_client;*/
+    rbusMessage msg = NULL;
     const char * sender = hdr->reply_topic;
     const char * event_name = NULL;
+    const char * object_name = NULL;
+    int32_t is_rbus_flag = 1;
     rtError err;
     size_t subs_len;
     size_t i;
     (void)closure;
-    
-    /*Sanitize the incoming data.*/
+
+   /*Sanitize the incoming data.*/
     if(MAX_OBJECT_NAME_LENGTH <= strlen(sender))
     {
         RBUSCORELOG_ERROR("Object name length exceeds limits.");
         return;
     }
+
+    rbusMessage_FromBytes(&msg, data, dataLen);
+
     rbusMessage_BeginMetaSectionRead(msg);
     err = rbusMessage_GetString(msg, &event_name);
+    err = rbusMessage_GetString(msg, &object_name);
+    err = rbusMessage_GetInt32(msg, &is_rbus_flag);
     rbusMessage_EndMetaSectionRead(msg);
     if(RT_OK != err)
     {
@@ -1336,7 +1343,24 @@ static void master_event_callback(rtMessageHeader const* hdr, uint8_t const* dat
         rbusMessage_Release(msg);
         return;
     }
-    
+
+    if(is_rbus_flag)
+    {
+        if(g_master_event_callback)
+        {
+            err = g_master_event_callback(sender, event_name, msg, g_master_event_user_data);
+            if(err != RTMESSAGE_BUS_EVENT_NOT_HANDLED)
+            {
+                rbusMessage_Release(msg);
+                return;
+            }
+        }
+        else
+        {
+            RBUSCORELOG_ERROR("Received rbus event but no master callback registered yet.");
+        }
+    }
+
     lock();
     subs_len = rtVector_Size(g_event_subscriptions_for_client);
     for(i = 0; i < subs_len; ++i)
@@ -1397,7 +1421,7 @@ static rbus_error_t remove_subscription_callback(const char * object_name,  cons
     return ret;
 }
 
-static rbus_error_t rbus_subscribeToEventInternal(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage filter, void * user_data, int* providerError, int timeout)
+static rbus_error_t rbus_subscribeToEventInternal(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage payload, void * user_data, int* providerError, int timeout)
 {
     /*using namespace rbus_client;*/
     rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
@@ -1438,56 +1462,62 @@ static rbus_error_t rbus_subscribeToEventInternal(const char * object_name,  con
     if(false == g_run_event_client_dispatch)
     {
         RBUSCORELOG_DEBUG("Starting event dispatching.");
-        rtConnection_AddDefaultListener(g_connection, &master_event_callback, NULL);
+        rtConnection_AddDefaultListener(g_connection, master_event_callback, NULL);
         g_run_event_client_dispatch = true;
     }
 
-    sub = rtVector_Find(g_event_subscriptions_for_client, object_name, client_subscription_compare);
-    if(sub)
+    if(g_master_event_callback == NULL)
     {
-        if(rtVector_Find(sub->events, event_name, client_event_compare))
+        sub = rtVector_Find(g_event_subscriptions_for_client, object_name, client_subscription_compare);
+        if(sub)
         {
-            /*sub already exist and event already registered so do nothing*/
-            RBUSCORELOG_WARN("Subscription exists for event %s::%s.", object_name, event_name);
-            unlock();
-            return RTMESSAGE_BUS_SUCCESS;
+            if(rtVector_Find(sub->events, event_name, client_event_compare))
+            {
+                /*sub already exist and event already registered so do nothing*/
+                RBUSCORELOG_WARN("Subscription exists for event %s::%s.", object_name, event_name);
+                unlock();
+                return RTMESSAGE_BUS_SUCCESS;
+            }
         }
-    }
-    else
-    {
-        /*sub didn't exist so create it*/
-        client_subscription_create(&sub, object_name);
-        rtVector_PushBack(g_event_subscriptions_for_client, sub);
-    }
+        else
+        {
+            /*sub didn't exist so create it*/
+            client_subscription_create(&sub, object_name);
+            rtVector_PushBack(g_event_subscriptions_for_client, sub);
+        }
 
-    /*create event and add to sub*/
-    client_event_create(&evt, event_name, callback, user_data);
-    rtVector_PushBack(sub->events, evt);
+        /*create event and add to sub*/
+        client_event_create(&evt, event_name, callback, user_data);
+        rtVector_PushBack(sub->events, evt);
+    }
     RBUSCORELOG_DEBUG("Added subscription for event %s::%s.", object_name, event_name);
 
     unlock();
 
-    if((ret = send_subscription_request(object_name, event_name, true, filter, providerError, timeout)) != RTMESSAGE_BUS_SUCCESS)
+    if((ret = send_subscription_request(object_name, event_name, true, payload, providerError, timeout)) != RTMESSAGE_BUS_SUCCESS)
     {
-        /*Something went wrong in the RPC. Undo what we did so far and report error.*/
-        lock();
-        remove_subscription_callback(object_name, event_name);
-        unlock();
+        if(g_master_event_callback == NULL)
+        {
+            /*Something went wrong in the RPC. Undo what we did so far and report error.*/
+            lock();
+            remove_subscription_callback(object_name, event_name);
+            unlock();
+        }
     }
     return ret;
 }
 
-rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage filter, void * user_data, int* providerError)
+rbus_error_t rbus_subscribeToEvent(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage payload, void * user_data, int* providerError)
 {
-    return rbus_subscribeToEventInternal(object_name, event_name, callback, filter, user_data, providerError, 0);
+    return rbus_subscribeToEventInternal(object_name, event_name, callback, payload, user_data, providerError, 0);
 }
 
-rbus_error_t rbus_subscribeToEventTimeout(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage filter, void * user_data, int* providerError, int timeout)
+rbus_error_t rbus_subscribeToEventTimeout(const char * object_name,  const char * event_name, rbus_event_callback_t callback, const rbusMessage payload, void * user_data, int* providerError, int timeout)
 {
-    return rbus_subscribeToEventInternal(object_name, event_name, callback, filter, user_data, providerError, timeout);
+    return rbus_subscribeToEventInternal(object_name, event_name, callback, payload, user_data, providerError, timeout);
 }
 
-rbus_error_t rbus_unsubscribeFromEvent(const char * object_name,  const char * event_name, const rbusMessage filter)
+rbus_error_t rbus_unsubscribeFromEvent(const char * object_name,  const char * event_name, const rbusMessage payload)
 {
     rbus_error_t ret = RTMESSAGE_BUS_ERROR_INVALID_PARAM;
 
@@ -1508,8 +1538,9 @@ rbus_error_t rbus_unsubscribeFromEvent(const char * object_name,  const char * e
     if(NULL == event_name)
         event_name = DEFAULT_EVENT;
 
-    remove_subscription_callback(object_name, event_name);
-    ret = send_subscription_request(object_name, event_name, false, filter, NULL, 0);
+    if(!g_master_event_callback)
+        remove_subscription_callback(object_name, event_name);
+    ret = send_subscription_request(object_name, event_name, false, payload, NULL, 0);
     return ret;
 }
 
@@ -1534,6 +1565,7 @@ rbus_error_t rbus_publishEvent(const char* object_name,  const char * event_name
     rbusMessage_BeginMetaSectionWrite(out);
     rbusMessage_SetString(out, event_name);
     rbusMessage_SetString(out, object_name); 
+    rbusMessage_SetInt32(out, 0); /*is ccsp and not rbus 2.0*/
     rbusMessage_EndMetaSectionWrite(out);
 
     lock();
@@ -1603,6 +1635,12 @@ rbus_error_t rbus_registerSubscribeHandler(const char* object_name, rbus_event_s
     return ret;
 }
 
+rbus_error_t rbus_registerMasterEventHandler(rbus_event_callback_t callback, void * user_data)
+{
+    g_master_event_callback = callback;
+    g_master_event_user_data = user_data;
+    return RTMESSAGE_BUS_SUCCESS;
+}
 rbus_error_t rbus_registerClientDisconnectHandler(rbus_client_disconnect_callback_t callback)
 {
     if(!g_advisory_listener_installed)
@@ -1647,6 +1685,7 @@ rbus_error_t rbus_publishSubscriberEvent(const char* object_name,  const char * 
     rbusMessage_BeginMetaSectionWrite(out);
     rbusMessage_SetString(out, event_name);
     rbusMessage_SetString(out, object_name); 
+    rbusMessage_SetInt32(out, 1);/*is rbus 2.0*/ 
     rbusMessage_EndMetaSectionWrite(out);
     lock();
     server_object_t obj = get_object(object_name);
