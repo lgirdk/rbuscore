@@ -28,6 +28,7 @@
 #include "rbus_logger.h"
 #include "rtVector.h"
 #include "rtAdvisory.h"
+#include "rtMemory.h"
 
 void rbusMessage_BeginMetaSectionWrite(rbusMessage message);
 void rbusMessage_EndMetaSectionWrite(rbusMessage message);
@@ -80,7 +81,7 @@ typedef struct _server_object
 
 void server_method_create(server_method_t* meth, char const* name, rbus_callback_t callback, void* data)
 {
-    (*meth) = malloc(sizeof(struct _server_method));
+    (*meth) = rt_malloc(sizeof(struct _server_method));
     strcpy((*meth)->name, name);
     (*meth)->callback = callback;
     (*meth)->data = data;
@@ -98,7 +99,7 @@ int server_event_compare(const void* left, const void* right)
 
 void server_event_create(server_event_t* event, const char * event_name, server_object_t obj, rbus_event_subscribe_callback_t sub_callback, void* sub_data)
 {
-    (*event) = malloc(sizeof(struct _server_event));
+    (*event) = rt_malloc(sizeof(struct _server_event));
     rtVector_Create(&(*event)->listeners);
     strcpy((*event)->name, event_name);
     (*event)->object = obj;
@@ -166,7 +167,7 @@ int server_object_compare(const void* left, const void* right)
 
 void server_object_create(server_object_t* obj, char const* name, rbus_callback_t callback, void* data)
 {
-    (*obj) = malloc(sizeof(struct _server_object));
+    (*obj) = rt_malloc(sizeof(struct _server_object));
     strcpy((*obj)->name, name);
     (*obj)->callback = callback;
     (*obj)->data = data;
@@ -234,7 +235,7 @@ typedef struct _queued_request
 
 void queued_request_create(queued_request_t* req, rtMessageHeader hdr, rbusMessage msg, server_object_t obj)
 {
-    (*req) = malloc(sizeof(struct _queued_request));
+    (*req) = rt_malloc(sizeof(struct _queued_request));
     (*req)->hdr = hdr;
     (*req)->msg = msg;
     (*req)->obj = obj;
@@ -258,7 +259,7 @@ typedef struct _client_subscription
 
 void client_event_create(client_event_t* event, const char* name, rbus_event_callback_t callback, void* data)
 {
-    (*event) = malloc(sizeof(struct _client_event));
+    (*event) = rt_malloc(sizeof(struct _client_event));
     (*event)->callback = callback;
     (*event)->data = data;
     strcpy((*event)->name, name);
@@ -276,7 +277,7 @@ int client_subscription_compare(const void* left, const void* right)
 
 void client_subscription_create(client_subscription_t* sub, const char * object_name)
 {
-    (*sub) = malloc(sizeof(struct _client_subscription));
+    (*sub) = rt_malloc(sizeof(struct _client_subscription));
     strcpy((*sub)->object, object_name);
     rtVector_Create(&(*sub)->events); 
 }
@@ -528,7 +529,7 @@ rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char 
 		return RTMESSAGE_BUS_ERROR_INVALID_STATE;
 	}
 	length = strlen (component_name);
-	pTempBuff = (char*) calloc (1, length + 10);
+	pTempBuff = (char*)rt_calloc (1, length + 10);
 
 	sprintf (pTempBuff, "rbus.%s", component_name);
 
@@ -1748,7 +1749,7 @@ rbus_error_t rbus_discoverWildcardDestinations(const char * expression, int * co
 
             if(size && length)
             {
-                char **array_ptr = (char **)malloc(size * sizeof(char *));
+                char **array_ptr = (char **)rt_try_malloc(size * sizeof(char *));
                 *count = size;
                 if (NULL != array_ptr)
                 {
@@ -1831,7 +1832,7 @@ rbus_error_t rbus_discoverObjectElements(const char * object, int * count, char 
             RBUSCORELOG_ERROR("rbus_GetElementsAddedByObject size missmatch");
         }
 
-        char **array_ptr = (char **)malloc(size * sizeof(char *));
+        char **array_ptr = (char **)rt_try_malloc(size * sizeof(char *));
         *count = size;
         if (NULL != array_ptr)
         {
@@ -1903,7 +1904,7 @@ rbus_error_t rbus_discoverElementObjects(const char* element, int * count, char 
             rtMessage_GetInt32(msg, RTM_DISCOVERY_COUNT, &num_elements);
             *count = num_elements;
 
-            char **array_ptr = (char **)malloc(num_elements * sizeof(char *));
+            char **array_ptr = (char **)rt_try_malloc(num_elements * sizeof(char *));
             if (NULL != array_ptr)
             {
                 *objects = array_ptr;
@@ -1988,9 +1989,9 @@ rbus_error_t rbus_discoverElementsObjects(int numElements, const char** elements
                 {
                     char **next = NULL;
                     if(!array_ptr)
-                        next = (char **)malloc(numComponents * sizeof(char *));
+                        next = (char **)rt_try_malloc(numComponents * sizeof(char *));
                     else
-                        next = (char **)realloc(array_ptr, (array_count + numComponents) * sizeof(char *));
+                        next = (char **)rt_try_realloc(array_ptr, (array_count + numComponents) * sizeof(char *));
                     if (!next)
                     {
                         RBUSCORELOG_ERROR("Memory allocation failure");
@@ -2083,7 +2084,7 @@ rbus_error_t rbus_discoverRegisteredComponents(int * count, char *** components)
             RBUSCORELOG_ERROR("rbus_registeredComponents size missmatch");
         }
 
-        char **array_ptr = (char **)malloc(size * sizeof(char *));
+        char **array_ptr = (char **)rt_try_malloc(size * sizeof(char *));
         *count = size;
         if (NULL != array_ptr)
         {

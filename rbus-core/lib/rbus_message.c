@@ -24,6 +24,7 @@
 #include <pthread.h>
 #include "rbus_logger.h"
 #include "rtRetainable.h"
+#include "rtMemory.h"
 #include "rbus_message.h"
 
 #define VERIFY_UNPACK_NEXT_ITEM()\
@@ -82,7 +83,7 @@ struct _rbusMessage
 
 void rbusMessage_Init(rbusMessage* message)
 {
-    struct _rbusMessage * ptr = malloc(sizeof(struct _rbusMessage));
+    struct _rbusMessage * ptr = rt_malloc(sizeof(struct _rbusMessage));
     msgpack_sbuffer_init(&ptr->sbuf);
     msgpack_packer_init(&ptr->pk, &ptr->sbuf, msgpack_sbuffer_write);
     msgpack_unpacked_init(&ptr->upk);
@@ -113,7 +114,7 @@ void rbusMessage_Release(rbusMessage message)
 
 void rbusMessage_FromBytes(rbusMessage* message, uint8_t const* buff, uint32_t n)
 {
-    struct _rbusMessage * ptr = malloc(sizeof(struct _rbusMessage));
+    struct _rbusMessage * ptr = rt_malloc(sizeof(struct _rbusMessage));
     msgpack_sbuffer_init(&ptr->sbuf);
     msgpack_unpacked_init(&ptr->upk);
     msgpack_sbuffer_write((void *)&ptr->sbuf, (const char *)buff, n);
@@ -133,7 +134,7 @@ void rbusMessage_ToDebugString(rbusMessage const m, char** s, uint32_t* n)
 {
     const int ALLOC_INCREMENT = 2048;
     int size = ALLOC_INCREMENT;
-    char * buffer = (char *)malloc(size);
+    char * buffer = (char *)rt_malloc(size);
     *s = buffer;
 
     int saved_offset = m->read_offset;
