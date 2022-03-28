@@ -28,7 +28,6 @@ endif (POLICY CMP0048)
 
 include(ExternalProject)
 cmake_policy(SET CMP0015 NEW)
-set(CMAKE_BUILD_TYPE Debug)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
 find_package(PkgConfig REQUIRED)

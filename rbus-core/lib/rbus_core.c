@@ -299,6 +299,7 @@ static char g_daemon_address[MAX_DAEMON_ADDRESS_LEN] = "unix:///tmp/rtrouted";
 static rtConnection g_connection = NULL;
 static rtVector g_server_objects; /*server_object_t list*/
 static pthread_mutex_t g_mutex;
+static int g_mutex_init = 0;
 static bool g_run_event_client_dispatch = false;
 static rtVector g_event_subscriptions_for_client; /*client_subscription_t list. Used by the subscriber to track all active subscriptions. */
 static rtVector g_queued_requests; /*list of queued_request */
@@ -326,13 +327,7 @@ static rbus_error_t send_subscription_request(const char * object_name, const ch
 
 static void perform_init()
 {
-	RBUSCORELOG_DEBUG("Performing init");
-
-	pthread_mutexattr_t attr;
-	pthread_mutexattr_init(&attr);
-	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
-	pthread_mutex_init(&g_mutex, &attr);
-
+    RBUSCORELOG_DEBUG("Performing init");
     rtVector_Create(&g_server_objects);
     rtVector_Create(&g_event_subscriptions_for_client);
 }
@@ -369,8 +364,6 @@ static void perform_cleanup()
     rtVector_Destroy(g_event_subscriptions_for_client, client_subscription_destroy);
 
     unlock();
-
-    pthread_mutex_destroy(&g_mutex);
 }
 
 rbus_error_t set_message_method(rbusMessage msg, const char *method)
@@ -380,13 +373,6 @@ rbus_error_t set_message_method(rbusMessage msg, const char *method)
     rbusMessage_EndMetaSectionWrite(msg);
 	  return RTMESSAGE_BUS_SUCCESS;
 }
-#if 0 /*mrollins cannot use this after converting g_server_objects to a dynamic rtVector*/
-static int dummyOnMessage(const char *, const char *, rtMessage, void *, rbusMessage *)
-{
-	/*do nothing.*/
-	return 0;
-}
-#endif
 
 static server_object_t get_object(const char * object_name)
 {
@@ -508,26 +494,56 @@ static void configure_router_address()
         }
         fclose(fconfig);
     }
-    RBUSCORELOG_INFO("Broker address: %s", g_daemon_address);
 }
 
-rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char * broker_address)
+rbus_error_t rbus_openBrokerConnection(const char * component_name)
+{
+    return rbus_openBrokerConnection2(component_name, NULL);
+}
+
+rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char* broker_address)
 {
 	rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
 	rtError result = RT_OK;
 	char *pTempBuff = NULL;
 	int length = 0;
 
-	if(NULL == component_name)
+	if(!component_name)
 	{
-		RBUSCORELOG_ERROR("Invalid parameter.");
+		RBUSCORELOG_ERROR("Invalid parameter: component name null");
 		return RTMESSAGE_BUS_ERROR_INVALID_PARAM;
 	}
-	if(NULL != g_connection)
+
+	/*TODO we really need a 1 call per process init function to initialize the global variables
+	and it might not be safe to switch from PTHREAD_MUTEX_ERRORCHECK and use static initializer PTHREAD_MUTEX_INITIALIZER*/
+	if(!g_mutex_init)
 	{
-		RBUSCORELOG_INFO("A connection already exists. Cannot open a new one.");
-		return RTMESSAGE_BUS_ERROR_INVALID_STATE;
+		pthread_mutexattr_t attr;
+		pthread_mutexattr_init(&attr);
+		pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+		pthread_mutex_init(&g_mutex, &attr);
+		g_mutex_init = 1;
 	}
+
+	lock();
+
+	/*only 1 connection per process*/
+	if(g_connection)
+	{
+		RBUSCORELOG_DEBUG("using previously opened connection for %s", component_name);
+		unlock();
+		return RTMESSAGE_BUS_SUCCESS;
+	}
+
+	/*nobody calls rbus_openBrokerConnection2 directly (except maybe some unit tests) so broker_address is always NULL*/
+	if(broker_address == NULL)
+	{
+		configure_router_address();/*this allows devices with split cpu environment to connect to rtrouted over tcp*/
+		broker_address = g_daemon_address;
+	}
+
+	RBUSCORELOG_INFO("Broker address: %s", broker_address);
+
 	length = strlen (component_name);
 	pTempBuff = (char*)rt_calloc (1, length + 10);
 
@@ -537,43 +553,43 @@ rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char 
 	result = rtConnection_Create(&g_connection, pTempBuff, broker_address);
 	if(RT_OK != result)
 	{
-		RBUSCORELOG_ERROR("Failed to create a connection. Error: 0x%x", result);
+		RBUSCORELOG_ERROR("Failed to create a connection for %s: Error: %d", component_name, result);
 		g_connection = NULL;
 		free (pTempBuff);
+		unlock();
 		return RTMESSAGE_BUS_ERROR_GENERAL;
 	}
-    /*
-	for(i = 0; i < MAX_REGISTERED_OBJECTS; i++)
-	{
-		g_server_objects[i].callback = dummyOnMessage;
-	}*/
-	RBUSCORELOG_DEBUG("Successfully created connection for %s.", component_name );
+
+	RBUSCORELOG_DEBUG("Successfully created connection for %s", component_name );
 	free (pTempBuff);
+	unlock();
 	return ret;
 }
 
-rbus_error_t rbus_openBrokerConnection(const char * component_name)
+rbus_error_t rbus_closeBrokerConnection()
 {
-#if 0 //Development aid.
-    if(std::is_move_constructible<subscription_t::entry_t>::value)
-        printf("entry_t is move constructible.");
-    if(std::is_move_assignable<subscription_t::entry_t>::value)
-        printf("entry_t is move assignable.");
-    if(std::is_nothrow_move_assignable<subscription_t::entry_t>::value)
-        printf("entry_t is no throw move assignable.");
-    if(std::is_nothrow_move_constructible<subscription_t::entry_t>::value)
-        printf("entry_t is no throw move constructible.");
-    if(std::is_move_constructible<subscription_t>::value)
-        printf("subscription_t is move constructible.");
-    if(std::is_move_assignable<subscription_t>::value)
-        printf("subscription_t is move assignable.");
-    if(std::is_nothrow_move_assignable<subscription_t>::value)
-        printf("subscription_t is no throw move assignable.");
-    if(std::is_nothrow_move_constructible<subscription_t>::value)
-        printf("subscription_t is no throw move constructible.");
-#endif
-	configure_router_address();
-	return rbus_openBrokerConnection2(component_name, g_daemon_address);
+    rtError err = RT_OK;
+    lock();
+    if(NULL == g_connection)
+    {
+        RBUSCORELOG_INFO("No connection exist to close.");
+        return RTMESSAGE_BUS_ERROR_INVALID_STATE;
+    }
+    perform_cleanup();
+    err = rtConnection_Destroy(g_connection);
+    if(RT_OK != err)
+    {
+        RBUSCORELOG_ERROR("Could not destroy connection. Error: 0x%x.", err);
+        return RTMESSAGE_BUS_ERROR_GENERAL;
+    }
+    g_connection = NULL;
+    unlock();
+
+    pthread_mutex_destroy(&g_mutex);
+    g_mutex_init = 0;
+
+    RBUSCORELOG_INFO("Destroyed connection.");
+    return RTMESSAGE_BUS_SUCCESS;
 }
 
 rtConnection rbus_getConnection()
@@ -646,27 +662,6 @@ static rbus_error_t send_subscription_request(const char * object_name, const ch
 
     return ret;
 }
-
-rbus_error_t rbus_closeBrokerConnection()
-{
-    rtError err = RT_OK;
-    if(NULL == g_connection)
-    {
-        RBUSCORELOG_INFO("No connection exist to close.");
-        return RTMESSAGE_BUS_ERROR_INVALID_STATE;
-    }
-    perform_cleanup();
-    err = rtConnection_Destroy(g_connection);
-    if(RT_OK != err)
-    {
-        RBUSCORELOG_ERROR("Could not destroy connection. Error: 0x%x.", err);
-        return RTMESSAGE_BUS_ERROR_GENERAL;
-    }
-    g_connection = NULL;
-    RBUSCORELOG_INFO("Destroyed connection.");
-    return RTMESSAGE_BUS_SUCCESS;
-}
-
 
 rbus_error_t rbus_registerObj(const char * object_name, rbus_callback_t handler, void * user_data)
 {
@@ -852,7 +847,10 @@ rbus_error_t rbus_unregisterObj(const char * object_name)
 
     err = rtConnection_RemoveListener(g_connection, object_name);
     if(RT_OK != err)
+    {
+        RBUSCORELOG_ERROR("rtConnection_RemoveListener %s failed: Err=%d", object_name, err);
         return RTMESSAGE_BUS_ERROR_GENERAL;
+    }
 
     lock();
     server_object_t obj = get_object(object_name);
@@ -1644,6 +1642,7 @@ rbus_error_t rbus_registerMasterEventHandler(rbus_event_callback_t callback, voi
 }
 rbus_error_t rbus_registerClientDisconnectHandler(rbus_client_disconnect_callback_t callback)
 {
+    lock();
     if(!g_advisory_listener_installed)
     {
         rtError err = rtConnection_AddListener(g_connection, RTMSG_ADVISORY_TOPIC, &rtrouted_advisory_callback, g_connection);
@@ -1654,21 +1653,25 @@ rbus_error_t rbus_registerClientDisconnectHandler(rbus_client_disconnect_callbac
         else
         {
             RBUSCORELOG_ERROR("Failed to add advisory listener: %d", err);
+            unlock();
             return RTMESSAGE_BUS_ERROR_GENERAL;
         }
         g_advisory_listener_installed = true;
+        g_client_disconnect_callback = callback;
     }
-    g_client_disconnect_callback = callback;
+    unlock();
     return RTMESSAGE_BUS_SUCCESS;
 }
 
 rbus_error_t rbus_unregisterClientDisconnectHandler()
 {
+    lock();
     if(g_advisory_listener_installed)
     {
         rtConnection_RemoveListener(g_connection, RTMSG_ADVISORY_TOPIC);
         g_advisory_listener_installed = false;
     }
+    unlock();
     return RTMESSAGE_BUS_SUCCESS;
 }
 
