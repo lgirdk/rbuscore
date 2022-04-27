@@ -555,6 +555,7 @@ rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char*
 	{
 		RBUSCORELOG_ERROR("Failed to create a connection for %s: Error: %d", component_name, result);
 		g_connection = NULL;
+		perform_cleanup();
 		free (pTempBuff);
 		unlock();
 		return RTMESSAGE_BUS_ERROR_GENERAL;
