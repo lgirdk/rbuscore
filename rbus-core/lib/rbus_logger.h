@@ -19,15 +19,17 @@
 #ifndef _RBUSCORE_LOG_H_
 #define _RBUSCORE_LOG_H_
 
+#include <stdarg.h>
+
 #ifdef ENABLE_RDKLOGGER
 #include "rdk_debug.h"
 
 
-#define RBUSCORELOG_ERROR(format...)       RDK_LOG(RDK_LOG_ERROR,  "LOG.RDK.RBUSCORE", format)
-#define RBUSCORELOG_WARN(format...)        RDK_LOG(RDK_LOG_WARN,   "LOG.RDK.RBUSCORE", format)
-#define RBUSCORELOG_INFO(format...)        RDK_LOG(RDK_LOG_INFO,   "LOG.RDK.RBUSCORE", format)
-#define RBUSCORELOG_DEBUG(format...)       RDK_LOG(RDK_LOG_DEBUG,  "LOG.RDK.RBUSCORE", format)
-#define RBUSCORELOG_TRACE(format...)       RDK_LOG(RDK_LOG_TRACE1, "LOG.RDK.RBUSCORE", format)
+#define RBUSCORELOG_ERROR(format, ...)       RDK_LOG(RDK_LOG_ERROR,  "LOG.RDK.RBUSCORE", format"\n", ##__VA_ARGS__)
+#define RBUSCORELOG_WARN(format, ...)        RDK_LOG(RDK_LOG_WARN,   "LOG.RDK.RBUSCORE", format"\n", ##__VA_ARGS__)
+#define RBUSCORELOG_INFO(format, ...)        RDK_LOG(RDK_LOG_INFO,   "LOG.RDK.RBUSCORE", format"\n", ##__VA_ARGS__)
+#define RBUSCORELOG_DEBUG(format, ...)       RDK_LOG(RDK_LOG_DEBUG,  "LOG.RDK.RBUSCORE", format"\n", ##__VA_ARGS__)
+#define RBUSCORELOG_TRACE(format, ...)       RDK_LOG(RDK_LOG_TRACE1, "LOG.RDK.RBUSCORE", format"\n", ##__VA_ARGS__)
 
 #else
 #include "rtLog.h"
