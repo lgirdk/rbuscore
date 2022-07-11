@@ -20,12 +20,11 @@
 Description= Session manager for rbus
 #Although this will launch before rbus, it will block until rbus is available
 #and will be immediately available for any other processes once rbus is up.
-Before=rbus.service
+After=rbus.service
 
 [Service]
 Type=simple
-ExecStartPre=/bin/sh -c 'if [ -e /lib/rdk/rbus_rfc_handler.sh ]; then (/lib/rdk/rbus_rfc_handler.sh); fi'
-ExecStart=/bin/sh -c 'if [ -e /nvram/rbus_support ]; then /usr/bin/rbus_session_mgr; fi'
+ExecStart=/bin/sh -c '/usr/bin/rbus_session_mgr'
 Restart=no
 
 [Install]

@@ -18,7 +18,6 @@
 ##########################################################################
 [Unit]
 Description= An IPC framework
-After=rbus_session_mgr.service
 
 [Service]
 Type=forking

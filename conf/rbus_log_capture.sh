@@ -2,11 +2,7 @@ RBUS_LOG_FILE="/rdklogs/logs/rtrouted.log"
 LAST_RBUS_LOG_TIME="/tmp/lastrtroutedlogtime"
 current_time=0
 lastsync_time=0
-loop=0
-
-if [ -f /nvram/rbus_support ]; then
-    loop=1
-fi
+loop=1
 
 while [ $loop -eq 1 ]
 do

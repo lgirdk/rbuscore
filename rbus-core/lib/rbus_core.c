@@ -498,7 +498,15 @@ static void configure_router_address()
 
 rbus_error_t rbus_openBrokerConnection(const char * component_name)
 {
-    return rbus_openBrokerConnection2(component_name, NULL);
+    if(RBUSCORE_DISABLED == rbuscore_checkBusStatus)
+    {
+        RBUSCORELOG_ERROR("RBUS is disabled");
+        return RTMESSAGE_BUS_ERROR_GENERAL;
+    }
+    else
+    {
+        return rbus_openBrokerConnection2(component_name, NULL);
+    }
 }
 
 rbus_error_t rbus_openBrokerConnection2(const char * component_name, const char* broker_address)
@@ -2135,20 +2143,10 @@ rbuscore_bus_status_t rbuscore_checkBusStatus(void)
     RBUSCORELOG_INFO ("RBus Enabled");
     return RBUSCORE_ENABLED;
 #else
-    if(access("/nvram/rbus_support", F_OK) == 0)
+    if(0 != access("/nvram/rbus_disable", F_OK))
     {
         RBUSCORELOG_INFO ("Currently RBus Enabled");
         return RBUSCORE_ENABLED;
-    }
-    else if(access("/nvram/rbus_support_on_pending", F_OK) == 0)
-    {
-        RBUSCORELOG_INFO ("Currently RBus is Disabled; Next boot - RBus Enabled");
-        return RBUSCORE_ENABLED_PENDING;
-    }
-    else if(access("/nvram/rbus_support_off_pending", F_OK) == 0)
-    {
-        RBUSCORELOG_INFO ("Currently RBus is Enabled; Next boot - RBus Disabled");
-        return RBUSCORE_DISABLED_PENDING;
     }
     else
     {

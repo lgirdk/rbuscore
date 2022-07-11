@@ -2,7 +2,6 @@
 Description= Capture rbus rtRouted process logs. Only for RDK-B devices
 After=rbus.service
 ConditionPathExists=/usr/bin/rbus_log_capture.sh
-ConditionPathExists=/nvram/rbus_support
 
 [Service]
 Type=simple
