@@ -234,7 +234,7 @@ TEST_F(TestServer, rbus_openBrokerConnection_test2)
     if(RBUS_OPEN_BROKER_CONNECTION(server_name, RTMESSAGE_BUS_SUCCESS))
     {
         err = rbus_openBrokerConnection(server_name);
-        EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
 
         RBUS_CLOSE_BROKER_CONNECTION(RTMESSAGE_BUS_SUCCESS);
     }
@@ -250,13 +250,22 @@ TEST_F(TestServer, rbus_openBrokerConnection_test3)
     if(RBUS_OPEN_BROKER_CONNECTION(server_name1, RTMESSAGE_BUS_SUCCESS))
     {
         err = rbus_openBrokerConnection(server_name1);
-        EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
 
         err = rbus_openBrokerConnection(server_name2);
-        EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
 
         RBUS_CLOSE_BROKER_CONNECTION(RTMESSAGE_BUS_SUCCESS);
     }
+    return;
+}
+
+TEST_F(TestServer, rbus_openBrokerConnection_test4)
+{
+    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
+    // Neg test with component name to be NULL
+    err = rbus_openBrokerConnection(NULL);
+    EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_PARAM) << "rbus_openBrokerConnection failed";
     return;
 }
 
@@ -299,7 +308,7 @@ TEST_F(TestServer, rbus_openBrokerConnection2_test4)
     {
 
         err = rbus_openBrokerConnection2(server_name,g_broker_address);
-        EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_openBrokerConnection failed to return error on duplicate connection attempt";
 
         RBUS_CLOSE_BROKER_CONNECTION(RTMESSAGE_BUS_SUCCESS);
     }

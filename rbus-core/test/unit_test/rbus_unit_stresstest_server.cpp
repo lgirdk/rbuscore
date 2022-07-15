@@ -144,6 +144,18 @@ static bool RBUS_PUSH_OBJECT(char* data, char* server_obj, rbus_error_t expected
     return true;
 }
 
+static int event_subscribe_callback(char const* object,  char const* eventName, char const* listener, int added, const rbusMessage payload, void* userData)
+{
+    printf("In event subscribe callback for object %s, event %s.\n", object, eventName);
+    return 0;
+}
+
+static void _client_disconnect_callback_handler(char const* listener)
+{
+    printf("******_client_disconnect_callback_handler called******\n");
+    fflush(stdout);
+}
+
 ::testing::AssertionResult doesStringMatch(const char * ipString, const char *resultstring, int stringCount)
 {
     if ((NULL != ipString) && (NULL != resultstring) && (0 != stringCount))
@@ -835,6 +847,307 @@ TEST_F(StressTestServer, rbusMessage_GetElementsAddedByObject_test1)
     }
 }
 
+TEST_F(StressTestServer, rbus_discoverElementObjects_test1)
+{
+    int counter = 5;
+    char client_name[] = "TEST_CLIENT_1";
+    char server_obj[] = "test_server_5.obj1";
+    char server_element[] = "test.1.box1";
+    bool conn_status = false;
+    rtError err = RT_OK;
+    int num_objects;
+    char** objects;
+    int i;
+
+    pid_t pid = fork();
+
+    if(pid == 0)
+    {
+        CREATE_RBUS_SERVER_INSTANCE(counter);
+        err = rbus_addElement(server_obj,server_element);
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_addElement failed";
+        printf("********** SERVER ENTERING PAUSED STATE******************** \n");
+        pause();
+    }
+    else if (pid > 0)
+    {
+        sleep(2);
+        conn_status = OPEN_BROKER_CONNECTION(client_name);
+        err = rbus_discoverElementObjects(server_element, &num_objects, &objects);
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbusMessage_discoverElementObjects failed";
+
+        for(i = 0; i < num_objects; ++i)
+            free(objects[i]);
+        free(objects);
+
+        if(conn_status)
+            CLOSE_BROKER_CONNECTION();
+
+        kill(pid,SIGTERM);
+        printf("Stoping server instance from createServer test\n");
+    }
+    else
+    {
+        printf("fork failed.\n");
+    }
+}
+
+TEST_F(StressTestServer, rbus_discoverElementObjects_test2)
+{
+    int counter = 5;
+    char client_name[] = "TEST_CLIENT_1";
+    bool conn_status = false;
+    rtError err = RT_OK;
+    int num_objects;
+    char** objects;
+    int i;
+
+    pid_t pid = fork();
+
+    if(pid == 0)
+    {
+        CREATE_RBUS_SERVER_INSTANCE(counter);
+        printf("********** SERVER ENTERING PAUSED STATE******************** \n");
+        pause();
+    }
+    else if (pid > 0)
+    {
+        sleep(2);
+        conn_status = OPEN_BROKER_CONNECTION(client_name);
+        //Testing with element to be NULL
+        err = rbus_discoverElementObjects(NULL, &num_objects, &objects);
+        EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_PARAM) << "rbusMessage_discoverElementObjects failed";
+
+        if(conn_status)
+            CLOSE_BROKER_CONNECTION();
+
+        kill(pid,SIGTERM);
+        printf("Stoping server instance from createServer test\n");
+    }
+    else
+    {
+        printf("fork failed.\n");
+    }
+}
+
+TEST_F(StressTestServer, rbus_discoverElementsObjects_test1)
+{
+    int counter = 5;
+    char client_name[] = "TEST_CLIENT_1";
+    char server_obj[] = "test_server_5.obj1";
+    const char *server_element[] = {"test.1.box1","test.1.box2","test.1.box3"};
+    bool conn_status = false;
+    rtError err = RT_OK;
+    int num_elements = 3;
+    int num_objects;
+    char** objects;
+    int i;
+
+    pid_t pid = fork();
+
+    if(pid == 0)
+    {
+        CREATE_RBUS_SERVER_INSTANCE(counter);
+        for(i=0; i < num_elements; i++)
+        {
+            err = rbus_addElement(server_obj,*(server_element + i));
+            EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_addElement failed";
+        }
+        printf("********** SERVER ENTERING PAUSED STATE******************** \n");
+        pause();
+    }
+    else if (pid > 0){
+        sleep(2);
+        conn_status = OPEN_BROKER_CONNECTION(client_name);
+        err = rbus_discoverElementsObjects(num_elements, server_element, &num_objects, &objects);
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbusMessage_discoverElementsObjects failed";
+
+        for(i = 0; i < num_objects; ++i)
+            free(objects[i]);
+        free(objects);
+
+        if(conn_status)
+            CLOSE_BROKER_CONNECTION();
+
+        kill(pid,SIGTERM);
+        printf("Stoping server instance from createServer test\n");
+    }
+    else
+    {
+        printf("fork failed.\n");
+    }
+}
+
+TEST_F(StressTestServer, rbus_discoverElementsObjects_test2)
+{
+    int counter = 5;
+    char client_name[] = "TEST_CLIENT_1";
+    bool conn_status = false;
+    rtError err = RT_OK;
+    int num_elements = 3;
+    int num_objects;
+    char** objects;
+    int i;
+
+    pid_t pid = fork();
+
+    if(pid == 0)
+    {
+        CREATE_RBUS_SERVER_INSTANCE(counter);
+        printf("********** SERVER ENTERING PAUSED STATE******************** \n");
+        pause();
+    }
+    else if (pid > 0){
+        sleep(2);
+        conn_status = OPEN_BROKER_CONNECTION(client_name);
+        //Testing with elements to be NULL
+        err = rbus_discoverElementsObjects(num_elements, NULL, &num_objects, &objects);
+        EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_PARAM) << "rbusMessage_discoverElementsObjects failed";
+
+        if(conn_status)
+            CLOSE_BROKER_CONNECTION();
+
+        kill(pid,SIGTERM);
+        printf("Stoping server instance from createServer test\n");
+    }
+    else
+    {
+        printf("fork failed.\n");
+    }
+}
+
+TEST_F(StressTestServer, rbus_addElementEvent_test1)
+{
+    int counter = 4, i = 0;
+    char client_name[] = "TEST_CLIENT_1";
+    char server_obj[] = "test_server_4.obj1";
+    char server_event[] = "test_server.Event!";
+    bool conn_status = false;
+    char test_string[] = "rbus_client_test_string";
+    char data[] = "data";
+    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
+
+    pid_t pid = fork();
+
+    if(pid == 0)
+    {
+        CREATE_RBUS_SERVER_INSTANCE(counter);
+        printf("******Registering Event %s with object %s****** \n", server_event, server_obj);
+        err = rbus_registerEvent(server_obj,server_event,sub1_callback,data);
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_registerEvent failed";
+        printf("*******Adding Event %s as an Element using rbus_addElementEvent******\n", server_event);
+        err = rbus_addElementEvent(server_obj,server_event);
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_addElementEvent failed";
+        printf("********** SERVER ENTERING PAUSED STATE******************** \n");
+        pause();
+    }
+    else if (pid > 0)
+    {
+        sleep(2);
+        conn_status = OPEN_BROKER_CONNECTION(client_name);
+        for(i = 0; i < 100; i++)
+        {
+            RBUS_PUSH_OBJECT(test_string, server_event, RTMESSAGE_BUS_SUCCESS);
+            RBUS_PULL_OBJECT(test_string, server_event, RTMESSAGE_BUS_SUCCESS);
+        }
+
+        if(conn_status)
+            CLOSE_BROKER_CONNECTION();
+
+        kill(pid,SIGTERM);
+    }
+    else
+    {
+        printf("fork failed.\n");
+    }
+}
+
+TEST_F(StressTestServer, rbus_addElementEvent_test2)
+{
+    int counter = 4, i = 0;
+    char client_name[] = "TEST_CLIENT_1";
+    char server_obj[] = "test_server_4.obj1";
+    char server_event[] = "test_server.Event!";
+    bool conn_status = false;
+    char test_string[] = "rbus_client_test_string";
+    char data[] = "data";
+    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
+
+    pid_t pid = fork();
+
+    if(pid == 0)
+    {
+        CREATE_RBUS_SERVER_INSTANCE(counter);
+        printf("******Registering Event %s with object %s****** \n", server_event, server_obj);
+        err = rbus_registerEvent(server_obj,server_event,sub1_callback,data);
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_registerEvent failed";
+        printf("*******Adding Event %s as an Element using rbus_addElementEvent******\n", server_event);
+        err = rbus_addElementEvent(server_obj,server_event);
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_addElementEvent failed";
+        //Testing Duplicate Entry
+        err = rbus_addElementEvent(server_obj,server_event);
+        EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_DUPLICATE_ENTRY) << "rbus_addElementEvent failed";
+        err = rbus_addElementEvent(server_obj,server_event);
+        EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_DUPLICATE_ENTRY) << "rbus_addElementEvent failed";
+        printf("********** SERVER ENTERING PAUSED STATE******************** \n");
+        pause();
+    }
+    else if (pid > 0)
+    {
+        sleep(2);
+        conn_status = OPEN_BROKER_CONNECTION(client_name);
+        for(i = 0; i < 100; i++)
+        {
+            RBUS_PUSH_OBJECT(test_string, server_event, RTMESSAGE_BUS_SUCCESS);
+            RBUS_PULL_OBJECT(test_string, server_event, RTMESSAGE_BUS_SUCCESS);
+        }
+
+        if(conn_status)
+            CLOSE_BROKER_CONNECTION();
+
+        kill(pid,SIGTERM);
+    }
+    else
+    {
+        printf("fork failed.\n");
+    }
+}
+
+TEST_F(StressTestServer, rbus_registerClientDisconnectHandler_test1)
+{
+    int counter = 4, i = 0;
+    char client_name[] = "TEST_CLIENT_1";
+    bool conn_status = false;
+    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
+
+    pid_t pid = fork();
+
+    if(pid == 0)
+    {
+        CREATE_RBUS_SERVER_INSTANCE(counter);
+        rbus_registerClientDisconnectHandler(_client_disconnect_callback_handler);
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_registerClientDisconnectHandler failed";
+        printf("********** SERVER ENTERING PAUSED STATE******************** \n");
+        pause();
+    }
+    else if (pid > 0)
+    {
+        sleep(2);
+        conn_status = OPEN_BROKER_CONNECTION(client_name);
+        if(conn_status)
+            CLOSE_BROKER_CONNECTION();
+        sleep(1);
+        kill(pid,SIGTERM);
+        printf("Stoping server instance from createServer test\n");
+    }
+    else
+    {
+        printf("fork failed.\n");
+    }
+    rbus_unregisterClientDisconnectHandler();
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_unregisterClientDisconnectHandler failed";
+}
+
 TEST_F(StressTestServer, rbus_removeElement_test1)
 {
     int counter = 4, i = 0;
@@ -1497,5 +1810,40 @@ TEST_F(StressTestServer, rbus_invokeMethodMsgSize_test2)
     {
         printf("fork failed.\n");
         return;
+    }
+}
+
+TEST_F(StressTestServer, rbus_registerSubscribeHandler_test1)
+{
+    int counter = 3;
+    char client_name[] = "TEST_CLIENT_1";
+    char server_obj[] = "test_server_5.obj1";
+    bool conn_status = false;
+    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
+
+    pid_t pid = fork();
+
+    if(pid == 0)
+    {
+        CREATE_RBUS_SERVER_INSTANCE(counter);
+        printf("********** SERVER ENTERING PAUSED STATE******************** \n");
+        pause();
+    }
+    else if (pid > 0)
+    {
+        sleep(4);
+        conn_status = OPEN_BROKER_CONNECTION(client_name);
+        err = rbus_registerObj(server_obj, callback, NULL);
+        EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "rbus_registerObj failed";
+        err = rbus_registerSubscribeHandler(server_obj, event_subscribe_callback, NULL);
+        EXPECT_EQ(err,RTMESSAGE_BUS_SUCCESS) << "rbus_registerSubscribeHandler failed";
+        if(conn_status)
+            CLOSE_BROKER_CONNECTION();
+
+        kill(pid,SIGTERM);
+        return;
+    }
+    else{
+        printf("fork failed \n");
     }
 }

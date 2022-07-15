@@ -32,6 +32,13 @@ extern "C" {
 
 #define DEFAULT_RESULT_BUFFERSIZE 128
 
+#define RBUS_SMGR_DESTINATION_NAME "_rbus_session_mgr" //Where to send the RPC calls.
+/* Supported RPC methods */
+#define RBUS_SMGR_METHOD_GET_CURRENT_SESSION_ID "get_curr_s" //Returns session id as int32, key MESSAGE_FIELD_PAYLOAD
+#define RBUS_SMGR_METHOD_REQUEST_SESSION_ID "req_new_s" //Returns new session id as int32, key MESSAGE_FIELD_PAYLOAD
+#define RBUS_SMGR_METHOD_END_SESSION "end_of_s" // Requires session id as input argument, key MESSAGE_FIELD_PAYLOAD
+
+
 typedef struct
 {
    char name[100];
@@ -46,6 +53,7 @@ char server_create[] = "./rbus_test_server alpha > /tmp/ll.txt  2>&1 &";
 #else
 char server_create[] = "/usr/bin/rbus_test_server alpha > /tmp/ll.txt  2>&1 &";
 #endif
+static int g_current_session_id = 0;
 
 class TestClient : public ::testing::Test{
 
@@ -181,6 +189,110 @@ static bool CALL_RBUS_PULL_OBJECT_DETAILED(char* server_obj, test_struct_t expec
     return result;
 }
 
+rbus_error_t CREATE_SESSION()
+{
+    rbusMessage response;
+    rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+
+    ret = rbus_invokeRemoteMethod(RBUS_SMGR_DESTINATION_NAME, RBUS_SMGR_METHOD_REQUEST_SESSION_ID, NULL, 1000, &response);
+    if(RTMESSAGE_BUS_SUCCESS == ret)
+    {
+        int result;
+        if(RT_OK == rbusMessage_GetInt32(response, &result))
+        {
+            if(RTMESSAGE_BUS_SUCCESS != result)
+            {
+                printf("ERROR Cannot create a new session, Session already exist \n");
+                ret = RTMESSAGE_BUS_ERROR_INVALID_STATE;
+                return ret;
+            }
+        }
+        if(RT_OK == rbusMessage_GetInt32(response, &g_current_session_id))
+        {
+            printf("Got new session id %d\n", g_current_session_id);
+            ret = RTMESSAGE_BUS_SUCCESS;
+            return ret;
+        }
+        else{
+            printf("Malformed response from session manager.\n");
+        }
+    }
+    else{
+        printf("RPC with session manager failed.\n");
+        ret = RTMESSAGE_BUS_ERROR_DESTINATION_UNREACHABLE;
+        return ret;
+    }
+}
+
+rbus_error_t PRINT_CURRENT_SESSION_ID()
+{
+    rbusMessage response;
+    rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+
+    ret = rbus_invokeRemoteMethod(RBUS_SMGR_DESTINATION_NAME, RBUS_SMGR_METHOD_GET_CURRENT_SESSION_ID, NULL, 1000, &response);
+
+    if(RTMESSAGE_BUS_SUCCESS == ret)
+    {
+        int result;
+        if(RT_OK == rbusMessage_GetInt32(response, &result))
+        {
+            if(RTMESSAGE_BUS_SUCCESS != result)
+            {
+                printf("Session manager reports internal error %d.\n", result);
+                ret = RTMESSAGE_BUS_ERROR_INVALID_STATE;
+                return ret;
+            }
+        }
+        if(RT_OK == rbusMessage_GetInt32(response, &g_current_session_id))
+        {
+            printf("Current session id %d\n", g_current_session_id);
+            ret = RTMESSAGE_BUS_SUCCESS;
+            return ret;
+        }
+        else{
+            printf("Malformed response from session manager.\n");
+        }
+    }
+    else{
+        printf("RPC with session manager failed.\n");
+        ret = RTMESSAGE_BUS_ERROR_DESTINATION_UNREACHABLE;
+        return ret;
+    }
+}
+
+rbus_error_t END_SESSION(int session)
+{
+    rbusMessage out;
+    rbusMessage response;
+
+    rbusMessage_Init(&out);
+    rbusMessage_SetInt32(out, session);
+    rbus_error_t ret = RTMESSAGE_BUS_SUCCESS;
+
+    if(RTMESSAGE_BUS_SUCCESS == rbus_invokeRemoteMethod(RBUS_SMGR_DESTINATION_NAME, RBUS_SMGR_METHOD_END_SESSION, out, 1000, &response))
+    {
+        int result;
+        if(RT_OK == rbusMessage_GetInt32(response, &result))
+        {
+            if(RTMESSAGE_BUS_SUCCESS != result)
+            {
+                printf("ERROR Cannot end session, It doesn't match active session\n");
+                ret = RTMESSAGE_BUS_ERROR_INVALID_STATE;
+                return ret;
+            }
+            else{
+                printf("Successfully ended session %d.\n", session);
+                ret = RTMESSAGE_BUS_SUCCESS;
+                return ret;
+            }
+        }
+    }
+    else{
+        printf("RPC with session manager failed.\n");
+        ret = RTMESSAGE_BUS_ERROR_DESTINATION_UNREACHABLE;
+        return ret;
+    }
+}
 
 TEST_F(TestClient, sample_test)
 {
@@ -361,4 +473,125 @@ TEST_F(TestClient, rbus_test_obj_coexistance_test1)
 
     if(conn_status)
         CALL_RBUS_CLOSE_BROKER_CONNECTION();
+}
+
+TEST_F(TestClient, rbus_session_manager_test1)
+{
+    char client_name[] = "TEST_CLIENT_1";
+    bool conn_status = false;
+    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
+
+    printf("*********************  CREATING CLIENT : %s \n", client_name);
+    conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
+    if(conn_status)
+        printf("Successfully connected to bus.\n");
+    err = CREATE_SESSION();
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "CREATE_SESSION failed";
+    err = PRINT_CURRENT_SESSION_ID();
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "PRINT_CURRENT_SESSION_ID failed";
+    err = END_SESSION(g_current_session_id);
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "END_SESSION failed";
+    conn_status = CALL_RBUS_CLOSE_BROKER_CONNECTION();
+    if(conn_status)
+        printf("Successfully disconnected from bus.\n");
+}
+
+TEST_F(TestClient, rbus_session_manager_test2)
+{
+    char client_name[] = "TEST_CLIENT_1";
+    bool conn_status = false;
+    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
+
+    printf("*********************  CREATING CLIENT : %s \n", client_name);
+    conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
+    if(conn_status)
+        printf("Successfully connected to bus.\n");
+    err = CREATE_SESSION();
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "CREATE_SESSION failed";
+    //Neg Test Calling CREATE_SESSION again
+    err = CREATE_SESSION();
+    EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "CREATE_SESSION failed";
+    err = PRINT_CURRENT_SESSION_ID();
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "PRINT_CURRENT_SESSION_ID failed";
+    err = END_SESSION(g_current_session_id);
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "END_SESSION failed";
+    conn_status = CALL_RBUS_CLOSE_BROKER_CONNECTION();
+    if(conn_status)
+        printf("Successfully disconnected from bus.\n");
+}
+
+TEST_F(TestClient, rbus_session_manager_test3)
+{
+    char client_name[] = "TEST_CLIENT_1";
+    bool conn_status = false;
+    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
+
+    printf("*********************  CREATING CLIENT : %s \n", client_name);
+    conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
+    if(conn_status)
+        printf("Successfully connected to bus.\n");
+    err = CREATE_SESSION();
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "CREATE_SESSION failed";
+    err = PRINT_CURRENT_SESSION_ID();
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "PRINT_CURRENT_SESSION_ID failed";
+    err = END_SESSION(g_current_session_id);
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "END_SESSION failed";
+    //Neg Test Calling END_SESSION again
+    err = END_SESSION(g_current_session_id);
+    EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "END_SESSION failed";
+    conn_status = CALL_RBUS_CLOSE_BROKER_CONNECTION();
+    if(conn_status)
+        printf("Successfully disconnected from bus.\n");
+}
+
+TEST_F(TestClient, rbus_session_manager_test4)
+{
+    char client_name[] = "TEST_CLIENT_1";
+    bool conn_status = false;
+    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
+
+    printf("*********************  CREATING CLIENT : %s \n", client_name);
+    conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
+    if(conn_status)
+        printf("Successfully connected to bus.\n");
+    err = CREATE_SESSION();
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "CREATE_SESSION failed";
+    //Neg Test Calling CREATE_SESSION multiple times
+    err = CREATE_SESSION();
+    EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "CREATE_SESSION failed";
+    err = CREATE_SESSION();
+    EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "CREATE_SESSION failed";
+    err = PRINT_CURRENT_SESSION_ID();
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "PRINT_CURRENT_SESSION_ID failed";
+    err = END_SESSION(g_current_session_id);
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "END_SESSION failed";
+    conn_status = CALL_RBUS_CLOSE_BROKER_CONNECTION();
+    if(conn_status)
+        printf("Successfully disconnected from bus.\n");
+}
+
+TEST_F(TestClient, rbus_session_manager_test5)
+{
+    char client_name[] = "TEST_CLIENT_1";
+    bool conn_status = false;
+    rbus_error_t err = RTMESSAGE_BUS_SUCCESS;
+
+    printf("*********************  CREATING CLIENT : %s \n", client_name);
+    conn_status = CALL_RBUS_OPEN_BROKER_CONNECTION(client_name);
+    if(conn_status)
+        printf("Successfully connected to bus.\n");
+    err = CREATE_SESSION();
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "CREATE_SESSION failed";
+    err = PRINT_CURRENT_SESSION_ID();
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "PRINT_CURRENT_SESSION_ID failed";
+    err = END_SESSION(g_current_session_id);
+    EXPECT_EQ(err, RTMESSAGE_BUS_SUCCESS) << "END_SESSION failed";
+    //Neg Test Calling END_SESSION multiple times
+    err = END_SESSION(g_current_session_id);
+    EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "END_SESSION failed";
+    err = END_SESSION(g_current_session_id);
+    EXPECT_EQ(err, RTMESSAGE_BUS_ERROR_INVALID_STATE) << "END_SESSION failed";
+    conn_status = CALL_RBUS_CLOSE_BROKER_CONNECTION();
+    if(conn_status)
+        printf("Successfully disconnected from bus.\n");
 }

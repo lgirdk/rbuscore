@@ -55,14 +55,6 @@ target_link_libraries(bin_server rbus-core)
 install (TARGETS bin_server bin_client #rbus_perf 
         RUNTIME DESTINATION bin)
 
-if (BUILD_RBUS_UNIT_TEST)
-add_subdirectory(unit_test)
-endif (BUILD_RBUS_UNIT_TEST)
-
-if (BUILD_RBUS_BENCHMARK_TEST)
-add_subdirectory(benchmark_test)
-endif (BUILD_RBUS_BENCHMARK_TEST)
-
 add_executable(rbus_sample_event_server sample_event_server.c)
 add_dependencies(rbus_sample_event_server rbus-core)
 target_link_libraries(rbus_sample_event_server rbus-core)
@@ -105,3 +97,10 @@ install (TARGETS rbus_sample_event_server rbus_sample_event_client rbus_sample_w
 
 endif (BUILD_RBUS_SAMPLE_APPS)
 
+if (BUILD_RBUS_UNIT_TEST)
+add_subdirectory(unit_test)
+endif (BUILD_RBUS_UNIT_TEST)
+
+if (BUILD_RBUS_BENCHMARK_TEST)
+add_subdirectory(benchmark_test)
+endif (BUILD_RBUS_BENCHMARK_TEST)
